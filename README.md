@@ -13,7 +13,7 @@ Every push to `main` runs [the build workflow](.github/workflows/build.yml), whi
 Updates install in place and keep settings and data because:
 
 - the application ID `nz.mileagelog.app` and the database file name never change;
-- every build is signed with the same release key, read from repository secrets (`MILEAGELOG_KEYSTORE_BASE64`, `MILEAGELOG_STOREPASSWORD`, `MILEAGELOG_KEYALIAS`, `MILEAGELOG_KEYPASSWORD`) or locally from `android/key.properties`;
+- every build is signed with the same release key, read from repository secrets (`MILEAGELOG_KEYSTORE_BASE64`, `MILEAGELOG_STOREPASSWORD`, `MILEAGELOG_KEYALIAS`; the PKCS12 key shares the store password) or locally from `android/key.properties`;
 - the build number is the Actions run number, so each build is newer than the last;
 - schema changes go through drift migrations that only add to the database;
 - the More tab can share a JSON backup and merge one back in, as a safety net.
