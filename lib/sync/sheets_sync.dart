@@ -149,9 +149,10 @@ class SheetsSync {
             insertDataOption: 'INSERT_ROWS',
           );
           idToRow[e.id] = rows.length + idToRow.length + 2;
-          // Rows the app created (not imported from this sheet) also go on
-          // Sheet1 in the original layout so the old sheet stays complete.
-          if (e.source != 'sheet_import') {
+          // Only fill-ups entered in the app also go on Sheet1 in the original
+          // layout. Imported history (this sheet or the old Road Trip app)
+          // stays off Sheet1 so "Queue all" never floods it with old rows.
+          if (e.source == 'app') {
             await api.spreadsheets.values.append(
               sheets.ValueRange(values: [legacyRow(e, tripKm: tripKm)]),
               spreadsheetId,
