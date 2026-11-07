@@ -1,0 +1,223 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../app.dart';
+import '../backup/backup.dart';
+import '../sync/sheets_sync.dart';
+import 'format.dart';
+import 'import_page.dart';
+import 'vehicle_page.dart';
+
+class MorePage extends StatefulWidget {
+  const MorePage({super.key});
+  @override
+  State<MorePage> createState() => _MorePageState();
+}
+
+class _MorePageState extends State<MorePage> {
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((i) {
+      if (mounted) setState(() => _version = '${i.version} (${i.buildNumber})');
+    });
+  }
+
+  void _snack(String msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
+  Future<void> _backup() async {
+    final scope = AppScope.of(context);
+    try {
+      final json = await exportBackupJson(scope.repo.db);
+      final dir = await getApplicationDocumentsDirectory();
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final file = File(p.join(dir.path, 'mileagelog-backup-$stamp.json'));
+      await file.writeAsString(json);
+      await scope.settings.setLastBackupAt(DateTime.now());
+      if (!mounted) return;
+      setState(() {});
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path, mimeType: 'application/json')], subject: 'MileageLog backup'));
+    } catch (e) {
+      _snack('Backup failed: $e');
+    }
+  }
+
+  Future<void> _restore() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
+    if (picked == null || picked.files.isEmpty) return;
+    final bytes = picked.files.first.bytes ?? await File(picked.files.first.path!).readAsBytes();
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Restore backup?'),
+        content: const Text('Rows in the backup are merged into the app by their ID. Nothing is deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Restore')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final summary = await restoreBackupJson(AppScope.of(context).repo.db, String.fromCharCodes(bytes));
+      _snack('Restored: $summary');
+    } catch (e) {
+      _snack('Restore failed: $e');
+    }
+  }
+
+  Future<void> _sheetsSettings() async {
+    final scope = AppScope.of(context);
+    final ctl = TextEditingController(text: scope.settings.spreadsheetId ?? '');
+    var enabled = scope.settings.sheetsSyncEnabled;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) => AlertDialog(
+          title: const Text('Google Sheets sync'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctl,
+                decoration: const InputDecoration(labelText: 'Spreadsheet link or ID', border: OutlineInputBorder()),
+                maxLines: 2,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Sync new fill-ups'),
+                value: enabled,
+                onChanged: (v) => setD(() => enabled = v),
+              ),
+              const Text('New fill-ups are appended to Sheet1 in the original layout and to a FillUps tab with full detail. Needs Google sign-in.', style: TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final id = ctl.text.trim().isEmpty ? null : settingsSpreadsheetId(ctl.text);
+    if (ctl.text.trim().isNotEmpty && id == null) {
+      _snack('That does not look like a Google Sheets link or ID');
+      return;
+    }
+    await scope.settings.setSpreadsheetId(id);
+    await scope.settings.setSheetsSyncEnabled(enabled && id != null);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _syncNow() async {
+    final scope = AppScope.of(context);
+    final id = scope.settings.spreadsheetId;
+    if (id == null) {
+      _snack('Set the spreadsheet first');
+      return;
+    }
+    try {
+      final n = await SheetsSync(scope.repo, id).flush();
+      _snack(n == 0 ? 'Nothing to sync' : 'Synced $n rows');
+    } catch (e) {
+      _snack('Sync failed: $e');
+    }
+  }
+
+  Future<void> _queueAll() async {
+    final scope = AppScope.of(context);
+    await scope.repo.enqueueAll(scope.settings.activeVehicleId!);
+    _snack('All fill-ups queued for the FillUps tab');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final s = scope.settings;
+    return Scaffold(
+      appBar: AppBar(title: const Text('More')),
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.directions_car_outlined),
+            title: const Text('Vehicle'),
+            subtitle: const Text('Name, tank size, rated economy'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.upload_file_outlined),
+            title: const Text('Import history'),
+            subtitle: const Text('Google Sheet CSV or the old app\'s export'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportPage())),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: const Text('Google Sheets sync'),
+            subtitle: Text(s.spreadsheetId == null ? 'Not set up' : (s.sheetsSyncEnabled ? 'On' : 'Off')),
+            onTap: _sheetsSettings,
+          ),
+          StreamBuilder<int>(
+            stream: scope.repo.watchPendingSyncCount(),
+            builder: (context, snap) => ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('Sync now'),
+              subtitle: Text('${snap.data ?? 0} rows waiting'),
+              enabled: s.spreadsheetId != null,
+              onTap: _syncNow,
+              trailing: TextButton(onPressed: s.spreadsheetId == null ? null : _queueAll, child: const Text('Queue all')),
+            ),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.save_alt),
+            title: const Text('Back up now'),
+            subtitle: Text(s.lastBackupAt == null ? 'Share a JSON file with everything in the app' : 'Last backup ${fmtDate(s.lastBackupAt!)}'),
+            onTap: _backup,
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Restore from backup'),
+            subtitle: const Text('Merge a MileageLog JSON backup into the app'),
+            onTap: _restore,
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.gps_fixed),
+            title: const Text('Use GPS on fill-ups'),
+            subtitle: const Text('One fix when the form opens, to pick the station'),
+            value: s.useGps,
+            onChanged: (v) async {
+              await s.setUseGps(v);
+              setState(() {});
+            },
+          ),
+          const Divider(),
+          AboutListTile(
+            icon: const Icon(Icons.info_outline),
+            applicationName: 'MileageLog',
+            applicationVersion: _version,
+            aboutBoxChildren: const [Text('Personal mileage, fuel and trip log. Data stays on this phone and in the exports you choose.')],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String? settingsSpreadsheetId(String text) {
+  final t = text.trim();
+  final m = RegExp(r'/spreadsheets/d/([A-Za-z0-9_-]{20,})').firstMatch(t);
+  if (m != null) return m[1];
+  if (RegExp(r'^[A-Za-z0-9_-]{20,}$').hasMatch(t)) return t;
+  return null;
+}

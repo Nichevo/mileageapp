@@ -4,7 +4,30 @@ A personal mileage app: log petrol fill-ups (and, later, EV charges), see fuel e
 
 Android first, built with Flutter so an iPhone build and a read-only web view can follow from the same code.
 
-Status: **planning**. No app code yet. See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+Status: **phase 1** (fill-ups, history, insights, import, backup, Sheets sync). See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+
+## Building and updating the Android app
+
+Every push to `main` runs [the build workflow](.github/workflows/build.yml), which tests the app and builds a release APK. The APK is attached to the run as an artifact and, when the signing secrets are present, published as a GitHub Release with a direct download link.
+
+Updates install in place and keep settings and data because:
+
+- the application ID `nz.mileagelog.app` and the database file name never change;
+- every build is signed with the same release key, read from repository secrets (`MILEAGELOG_KEYSTORE_BASE64`, `MILEAGELOG_STOREPASSWORD`, `MILEAGELOG_KEYALIAS`, `MILEAGELOG_KEYPASSWORD`) or locally from `android/key.properties`;
+- the build number is the Actions run number, so each build is newer than the last;
+- schema changes go through drift migrations that only add to the database;
+- the More tab can share a JSON backup and merge one back in, as a safety net.
+
+Without the secrets the workflow still builds, but signs with a throwaway debug key and names the APK `-UNSIGNED-debugkey`; such a build cannot update a properly signed install.
+
+Local development:
+
+```sh
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # drift code generation
+flutter test
+flutter run
+```
 
 ## Privacy rules for this repository
 
@@ -28,6 +51,13 @@ The pre-commit hook in `.githooks/` refuses a commit that contains an email addr
 ## Layout
 
 ```
+lib/data/        drift database, repository
+lib/domain/      fuel-economy maths
+lib/import/      Road Trip and Google Sheet CSV parsers
+lib/sync/        Google Sheets sync
+lib/backup/      JSON backup and restore
+lib/ui/          screens
+android/         Android project (stable app ID, signing from key.properties or env)
 docs/            plan, mock-ups, icon
 sample_data/     fictional sheet and Road Trip exports in the real import formats
 scripts/         privacy check and helpers

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and below: everything in the app's private storage is backed
+     up to the user's Google account (database, preferences, JSON backups).
+     Nothing here is shared with anyone else; it only restores to the same account. -->
+<full-backup-content>
+    <include domain="database" path="."/>
+    <include domain="sharedpref" path="."/>
+    <include domain="file" path="."/>
+    <exclude domain="file" path="flutter_assets"/>
+</full-backup-content>
