@@ -1,0 +1,54 @@
+# --- Personal data: never committed ---
+data/
+exports/
+backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.gpx
+*.kml
+# Real CSV/JSON exports anywhere except the fictional sample set
+*.csv
+*.json
+!sample_data/**
+!**/package.json
+!**/pubspec.lock.json
+
+# --- Secrets and local config ---
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+key.properties
+google-services.json
+GoogleService-Info.plist
+client_secret*.json
+*.pem
+*.p12
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+android/.gradle/
+android/local.properties
+android/app/.cxx/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner.xcworkspace/xcuserdata/
+macos/Pods/
+
+# --- OS ---
+.DS_Store
+Thumbs.db

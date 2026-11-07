@@ -1,0 +1,599 @@
+<title>MileageLog Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a row of phone frames on a quiet ground; each frame is a self-contained Android screen mock */
+:root{
+  --bg:#f3f4f1; --fg:#1c1f1b; --muted:#5f665d; --line:#d7dad3;
+  --phone:#ffffff; --phone-2:#f1f3ee; --accent:#1f6f3f; --accent-ink:#ffffff;
+  --warn:#b35a00; --ev:#1d5fa8; --map:#e9efe4; --road:#c7cfc0;
+  --display:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151815; --fg:#e8ebe5; --muted:#9aa396; --line:#2d322c;
+  --phone:#1e221e; --phone-2:#262b26; --accent:#5fbf84; --accent-ink:#0f1a13;
+  --warn:#e39a4a; --ev:#6ea8ef; --map:#222a22; --road:#3b463b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151815; --fg:#e8ebe5; --muted:#9aa396; --line:#2d322c;
+  --phone:#1e221e; --phone-2:#262b26; --accent:#5fbf84; --accent-ink:#0f1a13;
+  --warn:#e39a4a; --ev:#6ea8ef; --map:#222a22; --road:#3b463b; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 48px}
+h1{font-size:22px;font-weight:600;margin:0 0 4px;text-wrap:balance}
+.lead{color:var(--muted);max-width:60ch;margin:0 0 28px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:32px 24px;max-width:1400px}
+.shot{display:flex;flex-direction:column;gap:10px;min-width:0}
+.shot h2{font-size:15px;font-weight:600;margin:0}
+.shot p{color:var(--muted);margin:0;font-size:13px}
+.phone{background:var(--phone);border:1px solid var(--line);border-radius:28px;padding:10px;max-width:340px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.screen{border-radius:20px;background:var(--phone);border:1px solid var(--line);height:640px;display:flex;flex-direction:column;overflow:hidden}
+.status{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 16px 0}
+.appbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 8px;font-weight:600;font-size:17px}
+.appbar .ico{color:var(--muted);font-weight:400;font-size:13px}
+.body{flex:1;padding:4px 14px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-width:0}
+.nav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);padding:8px 6px 10px;font-size:10.5px;text-align:center;color:var(--muted)}
+.nav span{display:block}.nav .on{color:var(--accent);font-weight:600}
+.tile{background:var(--phone-2);border-radius:12px;padding:10px 12px}
+.tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-family:var(--mono);font-size:24px;font-weight:500;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:12px;color:var(--muted);font-family:var(--display)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:12px;text-align:center;font-weight:600;font-size:14px}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn.ev{background:var(--ev);color:#fff}
+.field{border:1px solid var(--line);border-radius:10px;padding:7px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.field .l{font-size:11px;color:var(--muted)}
+.field .v{font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums}
+.field .v.ph{color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--muted)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip.ev.on{background:var(--ev);border-color:var(--ev);color:#fff}
+.toggle{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.sw{width:34px;height:18px;border-radius:9px;background:var(--accent);position:relative}
+.sw::after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:7px;background:var(--accent-ink)}
+.sw.off{background:var(--line)}.sw.off::after{right:auto;left:2px;background:var(--phone)}
+.list{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)}
+.li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:12.5px}
+.li .d{color:var(--muted);font-size:11px}
+.li .n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.li .n.b{font-weight:500}
+.sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.note{font-size:11.5px;color:var(--muted)}
+.note.w{color:var(--warn)}
+svg{max-width:100%;display:block}
+.chart{background:var(--phone-2);border-radius:12px;padding:8px 10px 4px}
+.map{background:var(--map);border-radius:12px;position:relative;overflow:hidden}
+.badge{position:absolute;top:8px;left:8px;background:var(--phone);border-radius:999px;padding:3px 9px;font-size:11px;font-family:var(--mono)}
+.rec{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#d23c2a}
+.sheetbox{border:1px dashed var(--line);border-radius:10px;padding:8px 10px;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.sheetbox b{font-weight:600}
+.flow{margin-top:40px;max-width:900px}
+.flow h2{font-size:16px;margin:0 0 8px}
+.flow ol{margin:0;padding-left:20px;color:var(--muted);font-size:13px;display:grid;gap:4px}
+@media (max-width:420px){.phone{max-width:100%}.screen{height:600px}}
+</style>
+
+<h1>MileageLog screens</h1>
+<p class="lead">Six Android screens for the mileage app, drawn with sample figures. Green is petrol, blue is EV, and everything else stays quiet so the figures read first.</p>
+
+<div class="grid">
+
+<!-- 1 Dashboard -->
+<div class="shot">
+  <h2>1 · Dashboard</h2>
+  <p>Opens here. One big button to log a fill, the headline economy figure, and the trend.</p>
+  <div class="phone"><div class="screen">
+    <div class="status"><span>09:41</span><span>▲ 82%</span></div>
+    <div class="appbar"><span>My car · 148,304 km</span><span class="ico">⇄ car</span></div>
+    <div class="body">
+      <div class="btn">+ Log a fill-up</div>
+      <div class="row2">
+        <div class="tile"><div class="k">Last tank</div><div class="v">9.7 <small>L/100 km</small></div></div>
+        <div class="tile"><div class="k">Lifetime · since 2015</div><div class="v">8.5 <small>L/100 km</small></div></div>
+      </div>
+      <div class="row2">
+        <div class="tile"><div class="k">Last price</div><div class="v">$3.57 <small>/L</small></div></div>
+        <div class="tile"><div class="k">Cost / 100 km</div><div class="v">$34.5</div></div>
+      </div>
+      <div class="chart">
+        <div class="sec">L/100 km · last 10 fills</div>
+        <svg viewBox="0 0 280 90" aria-label="Fuel economy over the last ten fills">
+          <line x1="0" y1="70" x2="280" y2="70" stroke="var(--line)"/>
+          <line x1="0" y1="40" x2="280" y2="40" stroke="var(--line)" stroke-dasharray="3 3"/>
+          <text x="2" y="37" font-size="9" fill="var(--muted)">10</text>
+          <text x="2" y="67" font-size="9" fill="var(--muted)">8</text>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="14,48 42,50 70,44 98,38 126,32 154,54 182,46 210,15 238,74 266,37"/>
+          <circle cx="266" cy="37" r="3.5" fill="var(--accent)"/>
+          <text x="262" y="30" font-size="9" fill="var(--fg)" text-anchor="end">9.7</text>
+        </svg>
+      </div>
+      <div class="row2">
+        <div class="tile"><div class="k">This year</div><div class="v">3,931 <small>km</small></div><div class="note">$1,060 · 320 L</div></div>
+        <div class="tile"><div class="k">Sheet sync</div><div class="v" style="font-size:14px">✓ 23 Sep</div><div class="note">10 rows up to date</div></div>
+      </div>
+    </div>
+    <div class="nav"><span class="on">Home</span><span>History</span><span>Insights</span><span>More</span></div>
+  </div></div>
+</div>
+
+<!-- 2 Fill-up entry -->
+<div class="shot">
+  <h2>2 · Fill-up entry</h2>
+  <p>Keyboard opens on Odometer. Trip km and price per litre are calculated as you type.</p>
+  <div class="phone"><div class="screen">
+    <div class="status"><span>09:42</span><span>▲ 82%</span></div>
+    <div class="appbar"><span>New fill-up</span><span class="ico">✕</span></div>
+    <div class="body">
+      <div class="field"><span class="l">Date</span><span class="v">Today, 09:42</span></div>
+      <div class="field" style="border-color:var(--accent)"><span class="l">Odometer km</span><span class="v">148 7|</span></div>
+      <div class="note">Last: 148,304 km · trip so far 4xx km</div>
+      <div class="row2">
+        <div class="field"><span class="l">Litres</span><span class="v ph">0.00</span></div>
+        <div class="field"><span class="l">Total $</span><span class="v ph">0.00</span></div>
+      </div>
+      <div class="note">Price/L and L/100 km fill in once litres and cost are entered</div>
+      <div class="toggle"><span>Filled to full</span><span class="sw"></span></div>
+      <div class="sec">Station</div>
+      <div class="chips"><span class="chip on">Z</span><span class="chip">BP</span><span class="chip">Mobil</span><span class="chip">Gull</span><span class="chip">+</span></div>
+      <div class="sec">Payment</div>
+      <div class="chips"><span class="chip on">Sharetank</span><span class="chip">Pump price</span><span class="chip">Voucher</span></div>
+      <div class="field"><span class="l">Fuel</span><span class="v" style="font-size:13px">91 ▾</span></div>
+      <div class="field"><span class="l">Note</span><span class="v ph" style="font-size:13px">optional</span></div>
+      <div style="flex:1"></div>
+      <div class="btn">Save and sync to sheet</div>
+    </div>
+  </div></div>
+</div>
+
+<!-- 3 Trip recording -->
+<div class="shot">
+  <h2>3 · Trip recording and map</h2>
+  <p>While recording the screen is numbers only to save battery; the map is drawn on review, with stops and per-section km.</p>
+  <div class="phone"><div class="screen">
+    <div class="status"><span>14:05</span><span>▲ 71%</span></div>
+    <div class="appbar"><span>Taupō weekend</span><span class="ico">⋮</span></div>
+    <div class="body">
+      <div class="rec"><span class="dot"></span>Recording · 3 h 12 m · battery mode: adaptive</div>
+      <div class="map" style="height:200px">
+        <span class="badge">GPS 1/5 s · 4.1%/h</span>
+        <svg viewBox="0 0 300 200" aria-label="Trip trace with three stops">
+          <path d="M0 40 C60 30 90 80 140 70 S220 40 300 60" fill="none" stroke="var(--road)" stroke-width="10"/>
+          <path d="M120 0 C130 60 110 120 150 200" fill="none" stroke="var(--road)" stroke-width="8"/>
+          <path d="M22 28 C70 36 95 92 142 72 S215 40 262 58 L 268 120" fill="none" stroke="var(--accent)" stroke-width="3"/>
+          <circle cx="22" cy="28" r="6" fill="var(--phone)" stroke="var(--accent)" stroke-width="2.5"/>
+          <circle cx="142" cy="72" r="6" fill="var(--phone)" stroke="var(--accent)" stroke-width="2.5"/>
+          <circle cx="262" cy="58" r="6" fill="var(--phone)" stroke="var(--warn)" stroke-width="2.5"/>
+          <circle cx="268" cy="120" r="6" fill="var(--accent)"/>
+          <text x="34" y="22" font-size="10" fill="var(--fg)">Home</text>
+          <text x="150" y="90" font-size="10" fill="var(--fg)">Tīrau · lunch 42 m</text>
+          <text x="205" y="48" font-size="10" fill="var(--fg)">Z Taupō · fill</text>
+        </svg>
+      </div>
+      <div class="row2">
+        <div class="tile"><div class="k">GPS distance</div><div class="v">281 <small>km</small></div></div>
+        <div class="tile"><div class="k">Moving</div><div class="v">2:31 <small>avg 92 km/h</small></div></div>
+      </div>
+      <div class="sec">Sections</div>
+      <div class="list">
+        <div class="li"><span>Home → Tīrau</span><span class="n">148 km · 1:38</span><span class="d">Stop 42 m</span><span class="d">9.1 L/100</span></div>
+        <div class="li"><span>Tīrau → Z Taupō</span><span class="n">119 km · 1:12</span><span class="d">Fill-up 41.2 L</span><span class="d">—</span></div>
+        <div class="li"><span>Z Taupō → now</span><span class="n">14 km · 0:11</span><span class="d">in progress</span><span class="d"></span></div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="row2"><div class="btn ghost">Add stop</div><div class="btn">End trip</div></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- 4 History and export -->
+<div class="shot">
+  <h2>4 · History and export</h2>
+  <p>Every fill, newest first, with the sheet rows it came from. Export and backup live here.</p>
+  <div class="phone"><div class="screen">
+    <div class="status"><span>09:50</span><span>▲ 81%</span></div>
+    <div class="appbar"><span>History</span><span class="ico">⇪ export</span></div>
+    <div class="body">
+      <div class="chips"><span class="chip on">Fill-ups</span><span class="chip">Charges</span><span class="chip">Trips</span><span class="chip">Expenses</span><span class="chip">2026 ▾</span></div>
+      <div class="list">
+        <div class="li"><span>23 Sep 2026 · Z · Sharetank</span><span class="n b">9.67 L/100</span><span class="d">148,304 km · 413 km</span><span class="d">39.96 L · $142.64</span></div>
+        <div class="li"><span>2 Aug 2026 · Z · Sharetank</span><span class="n b">7.47 L/100</span><span class="d">147,891 km · 576 km</span><span class="d">43.00 L · $141.42</span></div>
+        <div class="li"><span>31 Jul 2026 · Z · Sharetank</span><span class="n b">9.88 L/100</span><span class="d">147,316 km · 319 km</span><span class="d">31.48 L · $102.27</span></div>
+        <div class="li"><span>14 Jun 2026</span><span class="n b">9.31 L/100</span><span class="d">146,997 km · 441 km</span><span class="d">41.05 L · $136.66</span></div>
+        <div class="li"><span>14 Apr 2026 · Z · Sharetank</span><span class="n b">9.01 L/100</span><span class="d">146,556 km · 446 km</span><span class="d">40.16 L · $150.16</span></div>
+        <div class="li"><span>24 Mar 2026 · Z · Sharetank</span><span class="n b">9.24 L/100</span><span class="d">146,110 km · 464 km</span><span class="d">42.86 L · $157.25</span></div>
+      </div>
+      <div class="note">148 fills imported from Road Trip export · 10 from sheet</div>
+      <div class="sec">Export and backup</div>
+      <div class="sheetbox"><b>Google Sheet “Mileage”</b><span>Sheet1 + FillUps, Trips, Summary tabs · synced 23 Sep</span><span style="color:var(--accent)">Re-export all ›</span></div>
+      <div class="sheetbox"><b>Dropbox backup</b><span>Apps/MileageLog · daily · last 06 Nov</span><span style="color:var(--accent)">Back up now ›</span></div>
+      <div class="row2"><div class="btn ghost">Share CSV</div><div class="btn ghost">Share JSON</div></div>
+    </div>
+    <div class="nav"><span>Home</span><span class="on">History</span><span>Insights</span><span>More</span></div>
+  </div></div>
+</div>
+
+<!-- 5 EV charge -->
+<div class="shot">
+  <h2>5 · EV charge entry</h2>
+  <p>Same shape as a fill-up with kWh instead of litres. Battery % can stand in for kWh at home chargers.</p>
+  <div class="phone"><div class="screen">
+    <div class="status"><span>21:15</span><span>▲ 64%</span></div>
+    <div class="appbar"><span>New charge · EV</span><span class="ico">✕</span></div>
+    <div class="body">
+      <div class="field"><span class="l">Date</span><span class="v">Today, 21:15</span></div>
+      <div class="field" style="border-color:var(--ev)"><span class="l">Odometer km</span><span class="v">12 48|</span></div>
+      <div class="sec">Charger</div>
+      <div class="chips"><span class="chip ev on">Home AC</span><span class="chip">Public AC</span><span class="chip">DC fast</span></div>
+      <div class="row2">
+        <div class="field"><span class="l">kWh added</span><span class="v">28.4</span></div>
+        <div class="field"><span class="l">Total $</span><span class="v">7.10</span></div>
+      </div>
+      <div class="row2">
+        <div class="field"><span class="l">Battery start</span><span class="v">22%</span></div>
+        <div class="field"><span class="l">Battery end</span><span class="v">95%</span></div>
+      </div>
+      <div class="note">Home tariff $0.25/kWh applied · 25.0 ¢/kWh effective</div>
+      <div class="toggle"><span>Charged to full</span><span class="sw off"></span></div>
+      <div class="sec">Network</div>
+      <div class="chips"><span class="chip ev on">Home</span><span class="chip">ChargeNet</span><span class="chip">Z</span><span class="chip">+</span></div>
+      <div class="tile" style="border-left:3px solid var(--ev)">
+        <div class="k">Since the EV arrived</div>
+        <div class="v" style="font-size:18px">$4.10 <small>/100 km vs $34.50 petrol</small></div>
+        <div class="note">Saved $612 over 2,010 km · 0.9 kg CO₂/100 km vs 21.5</div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="btn ev">Save charge</div>
+    </div>
+  </div></div>
+</div>
+
+<!-- 6 Insights -->
+<div class="shot">
+  <h2>6 · Insights</h2>
+  <p>The whole screen scrolls. Charts are drawn from the sample history.</p>
+  <div class="phone"><div class="screen" style="height:auto">
+    <div class="status"><span>10:02</span><span>▲ 80%</span></div>
+    <div class="appbar"><span>Insights</span><span class="ico">⇪ share</span></div>
+    <div class="body">
+      <div class="chips"><span class="chip">1 yr</span><span class="chip">3 yr</span><span class="chip on">All</span><span class="chip">Petrol ▾</span></div>
+
+      <div class="chart">
+        <div class="sec">Distance per year · km</div>
+        <svg viewBox="0 0 280 100" aria-label="Kilometres driven per year 2015 to 2026">
+          <g fill="var(--accent)">
+            <rect x="12" y="12" width="16" height="70"/><rect x="34" y="26" width="16" height="56"/><rect x="56" y="44" width="16" height="38"/><rect x="78" y="46" width="16" height="36"/><rect x="100" y="62" width="16" height="20"/><rect x="122" y="68" width="16" height="14"/><rect x="144" y="67" width="16" height="15"/><rect x="166" y="44" width="16" height="38"/><rect x="188" y="50" width="16" height="32"/><rect x="210" y="57" width="16" height="25"/><rect x="232" y="60" width="16" height="22"/>
+            <rect x="254" y="66" width="16" height="16" opacity=".45"/>
+          </g>
+          <line x1="8" y1="82" x2="272" y2="82" stroke="var(--line)"/>
+          <g font-size="8" fill="var(--muted)" text-anchor="middle"><text x="20" y="94">15</text><text x="64" y="94">17</text><text x="108" y="94">19</text><text x="152" y="94">21</text><text x="196" y="94">23</text><text x="240" y="94">25</text></g>
+          <text x="20" y="8" font-size="8" fill="var(--fg)" text-anchor="middle">13.6k</text>
+          <text x="262" y="62" font-size="8" fill="var(--muted)" text-anchor="middle">3.1k</text>
+        </svg>
+        <div class="note">13,600 km in 2015 down to about 4,500 a year since 2019. 2026 is year to date.</div>
+      </div>
+
+      <div class="chart">
+        <div class="sec">Cost per 100 km · $ (line) and price per litre (dots)</div>
+        <svg viewBox="0 0 280 100" aria-label="Cost per 100 km and price per litre by year">
+          <line x1="8" y1="82" x2="272" y2="82" stroke="var(--line)"/>
+          <line x1="8" y1="46" x2="272" y2="46" stroke="var(--line)" stroke-dasharray="3 3"/>
+          <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="20,55 42,58 64,52 86,48 108,38 130,46 152,37 174,33 196,34 218,35 240,34 262,22"/>
+          <g fill="var(--warn)"><circle cx="20" cy="66" r="2.5"/><circle cx="42" cy="70" r="2.5"/><circle cx="64" cy="68" r="2.5"/><circle cx="86" cy="61" r="2.5"/><circle cx="108" cy="59" r="2.5"/><circle cx="130" cy="63" r="2.5"/><circle cx="152" cy="55" r="2.5"/><circle cx="174" cy="42" r="2.5"/><circle cx="196" cy="43" r="2.5"/><circle cx="218" cy="43" r="2.5"/><circle cx="240" cy="46" r="2.5"/><circle cx="262" cy="33" r="2.5"/></g>
+          <text x="20" y="50" font-size="8" fill="var(--fg)" text-anchor="middle">$15.9</text>
+          <text x="258" y="16" font-size="8" fill="var(--fg)" text-anchor="end">$30.4</text>
+          <text x="262" y="92" font-size="8" fill="var(--warn)" text-anchor="end">$3.37/L</text>
+          <text x="20" y="92" font-size="8" fill="var(--warn)" text-anchor="middle">$2.02/L</text>
+        </svg>
+        <div class="note">Running cost has nearly doubled, almost all of it pump price: $2.02/L in 2015, $3.37/L this year.</div>
+      </div>
+
+      <div class="chart">
+        <div class="sec">Fuel economy · L/100 km, rolling 5 fills</div>
+        <svg viewBox="0 0 280 100" aria-label="Fuel economy trend 2015 to 2026">
+          <line x1="8" y1="82" x2="272" y2="82" stroke="var(--line)"/>
+          <line x1="8" y1="30" x2="272" y2="30" stroke="var(--line)" stroke-dasharray="3 3"/>
+          <text x="10" y="27" font-size="8" fill="var(--muted)">10</text>
+          <text x="10" y="79" font-size="8" fill="var(--muted)">7</text>
+          <path d="M14 66 C40 70 60 62 86 60 S120 44 134 30 S160 50 180 44 S220 52 240 48 S258 40 266 38" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <rect x="94" y="12" width="60" height="70" fill="var(--warn)" opacity=".08"/>
+          <text x="124" y="10" font-size="8" fill="var(--warn)" text-anchor="middle">2019–21: short trips</text>
+        </svg>
+        <div class="note">7.9 L/100 km in 2015, 10.0 in 2019 when annual distance fell, back near 8.5 since.</div>
+      </div>
+
+      <div class="chart">
+        <div class="sec">Driving by month · km per day, all years</div>
+        <svg viewBox="0 0 280 100" aria-label="Average kilometres per day by calendar month">
+          <g fill="var(--accent)">
+            <rect x="12" y="35" width="16" height="47"/><rect x="34" y="49" width="16" height="33"/><rect x="56" y="42" width="16" height="40"/><rect x="78" y="29" width="16" height="53"/><rect x="100" y="21" width="16" height="61"/><rect x="122" y="21" width="16" height="61"/><rect x="144" y="51" width="16" height="31"/><rect x="166" y="31" width="16" height="51"/><rect x="188" y="63" width="16" height="19"/><rect x="210" y="11" width="16" height="71"/><rect x="232" y="46" width="16" height="36"/><rect x="254" y="53" width="16" height="29"/>
+          </g>
+          <line x1="8" y1="82" x2="272" y2="82" stroke="var(--line)"/>
+          <g font-size="8" fill="var(--muted)" text-anchor="middle"><text x="20" y="94">J</text><text x="42" y="94">F</text><text x="64" y="94">M</text><text x="86" y="94">A</text><text x="108" y="94">M</text><text x="130" y="94">J</text><text x="152" y="94">J</text><text x="174" y="94">A</text><text x="196" y="94">S</text><text x="218" y="94">O</text><text x="240" y="94">N</text><text x="262" y="94">D</text></g>
+          <text x="218" y="8" font-size="8" fill="var(--fg)" text-anchor="middle">57</text>
+          <text x="196" y="60" font-size="8" fill="var(--muted)" text-anchor="middle">16</text>
+        </svg>
+        <div class="note">October and May–June are the busy months; September is the quietest.</div>
+      </div>
+
+      <div class="chart">
+        <div class="sec">Weekday vs weekend</div>
+        <div class="row2" style="margin:6px 0 4px">
+          <div><div class="k" style="font-size:10px;color:var(--muted)">Fill-ups</div><div class="v" style="font-family:var(--mono);font-size:18px">118 <small style="font-size:10px;color:var(--muted)">weekday</small> · 40 <small style="font-size:10px;color:var(--muted)">weekend</small></div></div>
+          <div><div class="k" style="font-size:10px;color:var(--muted)">Busiest fill day</div><div class="v" style="font-family:var(--mono);font-size:18px">Thu <small style="font-size:10px;color:var(--muted)">34 of 158</small></div></div>
+        </div>
+        <svg viewBox="0 0 280 60" aria-label="Fill-ups by day of week">
+          <g fill="var(--accent)"><rect x="16" y="24" width="24" height="18"/><rect x="52" y="14" width="24" height="28"/><rect x="88" y="22" width="24" height="20"/><rect x="124" y="4" width="24" height="38"/><rect x="160" y="14" width="24" height="28"/><rect x="196" y="26" width="24" height="16" opacity=".5"/><rect x="232" y="13" width="24" height="29" opacity=".5"/></g>
+          <line x1="8" y1="42" x2="272" y2="42" stroke="var(--line)"/>
+          <g font-size="8" fill="var(--muted)" text-anchor="middle"><text x="28" y="54">Mon</text><text x="64" y="54">Tue</text><text x="100" y="54">Wed</text><text x="136" y="54">Thu</text><text x="172" y="54">Fri</text><text x="208" y="54">Sat</text><text x="244" y="54">Sun</text></g>
+        </svg>
+        <div class="note">Weekend vs weekday km needs recorded trips (phase 2); until then this shows when fills happen.</div>
+      </div>
+    </div>
+    <div class="nav"><span>Home</span><span>History</span><span class="on">Insights</span><span>More</span></div>
+  </div></div>
+</div>
+
+</div>
+
+<style>
+.icons{margin-top:40px;max-width:1100px}
+.icons h2{font-size:16px;margin:0 0 4px}
+.icons>p{color:var(--muted);font-size:13px;margin:0 0 18px;max-width:65ch}
+.irow{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+.icard{display:flex;flex-direction:column;gap:10px;min-width:0}
+.icard h3{font-size:14px;font-weight:600;margin:0}
+.icard p{font-size:12.5px;color:var(--muted);margin:0}
+.sizes{display:flex;align-items:flex-end;gap:14px;background:var(--phone-2);border-radius:14px;padding:16px}
+.sizes svg{flex:none}
+.sizes .lbl{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;margin-top:4px}
+.pick{border-left:3px solid var(--accent);padding-left:10px}
+</style>
+<div class="icons">
+  <h2>App icon</h2>
+  <p>Direction A is the chosen icon; B and C are kept for the record. Each is drawn as an Android adaptive icon (the artwork stays inside the inner 66% so round, squircle and square masks all work). The same mark is shown at launcher size and at notification size, where it has to survive as a single colour.</p>
+  <div class="irow">
+
+    <div class="icard pick">
+      <h3>A · Gauge, nozzle to bolt (chosen)</h3>
+      <p>A dial whose needle sweeps from a petrol pump to a lightning bolt: fuel economy today, EV later, and a trip computer's shape throughout. Reads at 24 px as a simple gauge.</p>
+      <div class="sizes">
+        <div>
+          <svg width="108" height="108" viewBox="0 0 108 108" aria-label="Gauge icon, large">
+            <defs><clipPath id="sqA"><path d="M54 2C92 2 106 16 106 54S92 106 54 106 2 92 2 54 16 2 54 2z"/></clipPath></defs>
+            <g clip-path="url(#sqA)"><rect width="108" height="108" fill="#1f6f3f"/><rect y="66" width="108" height="42" fill="#185a33"/></g>
+            <path d="M22 70 A34 34 0 0 1 86 70" fill="none" stroke="#eaf5ec" stroke-width="7" stroke-linecap="round"/>
+            <path d="M22 70 A34 34 0 0 1 40 41" fill="none" stroke="#9fe0b7" stroke-width="7" stroke-linecap="round"/>
+            <line x1="54" y1="70" x2="43" y2="46" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="54" cy="70" r="5.5" fill="#fff"/>
+            <path d="M26 86h8v-12h-8zM34 76h3v10h-3z" fill="#eaf5ec"/>
+            <path d="M76 73l-4 8h4l-2 7 7-10h-4l3-5z" fill="#ffd166"/>
+          </svg>
+          <div class="lbl">108 · launcher</div>
+        </div>
+        <div>
+          <svg width="48" height="48" viewBox="0 0 108 108" aria-label="Gauge icon, medium">
+            <circle cx="54" cy="54" r="52" fill="#1f6f3f"/>
+            <path d="M22 70 A34 34 0 0 1 86 70" fill="none" stroke="#eaf5ec" stroke-width="8" stroke-linecap="round"/>
+            <line x1="54" y1="70" x2="43" y2="46" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="54" cy="70" r="6" fill="#fff"/>
+          </svg>
+          <div class="lbl">48 · round</div>
+        </div>
+        <div>
+          <svg width="24" height="24" viewBox="0 0 108 108" aria-label="Gauge icon, notification">
+            <path d="M22 70 A34 34 0 0 1 86 70" fill="none" stroke="var(--fg)" stroke-width="12" stroke-linecap="round"/>
+            <line x1="54" y1="72" x2="40" y2="44" stroke="var(--fg)" stroke-width="10" stroke-linecap="round"/>
+            <circle cx="54" cy="72" r="9" fill="var(--fg)"/>
+          </svg>
+          <div class="lbl">24 · mono</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="icard">
+      <h3>B · Odometer window</h3>
+      <p>Three rolling digits in a flip-counter window, the last one mid-roll. Says "mileage" instantly and gives the app a numeric personality that matches the mono figures on the screens.</p>
+      <div class="sizes">
+        <div>
+          <svg width="108" height="108" viewBox="0 0 108 108" aria-label="Odometer icon, large">
+            <defs><clipPath id="sqB"><path d="M54 2C92 2 106 16 106 54S92 106 54 106 2 92 2 54 16 2 54 2z"/></clipPath></defs>
+            <g clip-path="url(#sqB)"><rect width="108" height="108" fill="#202a22"/></g>
+            <rect x="22" y="36" width="64" height="36" rx="6" fill="#111713"/>
+            <g font-family="IBM Plex Mono, monospace" font-size="26" font-weight="500" fill="#eaf5ec" text-anchor="middle">
+              <text x="36" y="63">1</text><text x="54" y="63">4</text>
+            </g>
+            <g clip-path="url(#sqB)">
+              <text x="72" y="63" font-family="IBM Plex Mono, monospace" font-size="26" font-weight="500" fill="#9fe0b7" text-anchor="middle">8</text>
+              <rect x="63" y="36" width="20" height="10" fill="#111713" opacity=".7"/>
+              <rect x="63" y="62" width="20" height="10" fill="#111713" opacity=".7"/>
+            </g>
+            <line x1="22" y1="54" x2="86" y2="54" stroke="#202a22" stroke-width="1.5"/>
+            <rect x="30" y="76" width="48" height="4" rx="2" fill="#1f6f3f"/>
+          </svg>
+          <div class="lbl">108 · launcher</div>
+        </div>
+        <div>
+          <svg width="48" height="48" viewBox="0 0 108 108" aria-label="Odometer icon, medium">
+            <circle cx="54" cy="54" r="52" fill="#202a22"/>
+            <rect x="22" y="36" width="64" height="36" rx="6" fill="#111713"/>
+            <text x="54" y="64" font-family="IBM Plex Mono, monospace" font-size="28" font-weight="500" fill="#eaf5ec" text-anchor="middle">148</text>
+          </svg>
+          <div class="lbl">48 · round</div>
+        </div>
+        <div>
+          <svg width="24" height="24" viewBox="0 0 108 108" aria-label="Odometer icon, notification">
+            <rect x="14" y="30" width="80" height="48" rx="8" fill="none" stroke="var(--fg)" stroke-width="10"/>
+            <line x1="40" y1="30" x2="40" y2="78" stroke="var(--fg)" stroke-width="8"/>
+            <line x1="68" y1="30" x2="68" y2="78" stroke="var(--fg)" stroke-width="8"/>
+          </svg>
+          <div class="lbl">24 · mono</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="icard">
+      <h3>C · Road to drop</h3>
+      <p>A winding road that ends in a fuel-drop map pin. Leans on the trip side of the app; the drop doubles as a charge droplet in the EV theme by swapping the colour.</p>
+      <div class="sizes">
+        <div>
+          <svg width="108" height="108" viewBox="0 0 108 108" aria-label="Road to drop icon, large">
+            <defs><clipPath id="sqC"><path d="M54 2C92 2 106 16 106 54S92 106 54 106 2 92 2 54 16 2 54 2z"/></clipPath></defs>
+            <g clip-path="url(#sqC)"><rect width="108" height="108" fill="#e8efe3"/></g>
+            <path d="M22 92 C40 92 30 60 50 58 S70 44 66 34" fill="none" stroke="#1f6f3f" stroke-width="9" stroke-linecap="round"/>
+            <path d="M22 92 C40 92 30 60 50 58 S70 44 66 34" fill="none" stroke="#e8efe3" stroke-width="2" stroke-dasharray="5 6" stroke-linecap="round"/>
+            <path d="M66 14c10 12 14 18 14 25a14 14 0 0 1-28 0c0-7 4-13 14-25z" fill="#1f6f3f"/>
+            <circle cx="66" cy="39" r="5" fill="#9fe0b7"/>
+          </svg>
+          <div class="lbl">108 · launcher</div>
+        </div>
+        <div>
+          <svg width="48" height="48" viewBox="0 0 108 108" aria-label="Road to drop icon, medium">
+            <circle cx="54" cy="54" r="52" fill="#e8efe3"/>
+            <path d="M24 90 C44 90 32 60 52 58 S70 46 66 36" fill="none" stroke="#1f6f3f" stroke-width="10" stroke-linecap="round"/>
+            <path d="M66 14c10 12 14 18 14 25a14 14 0 0 1-28 0c0-7 4-13 14-25z" fill="#1f6f3f"/>
+          </svg>
+          <div class="lbl">48 · round</div>
+        </div>
+        <div>
+          <svg width="24" height="24" viewBox="0 0 108 108" aria-label="Road to drop icon, notification">
+            <path d="M18 94 C44 94 30 58 52 56 S72 44 66 34" fill="none" stroke="var(--fg)" stroke-width="12" stroke-linecap="round"/>
+            <path d="M66 8c12 14 17 21 17 29a17 17 0 0 1-34 0c0-8 5-15 17-29z" fill="var(--fg)"/>
+          </svg>
+          <div class="lbl">24 · mono</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.widgets{margin-top:40px;max-width:1100px}
+.widgets h2{font-size:16px;margin:0 0 4px}
+.widgets>p{color:var(--muted);font-size:13px;margin:0 0 18px;max-width:65ch}
+.home{background:linear-gradient(160deg,#5a7d6a,#2f4a3c);border-radius:20px;padding:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:380px}
+.wg{background:var(--phone);border-radius:14px;padding:10px 12px;color:var(--fg);display:flex;flex-direction:column;gap:4px;min-width:0;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.wg .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wg .v{font-family:var(--mono);font-size:20px;font-weight:500;line-height:1.1;font-variant-numeric:tabular-nums}
+.wg .v small{font-size:10px;color:var(--muted);font-family:var(--display)}
+.wg.cta{background:var(--accent);color:var(--accent-ink);justify-content:center;align-items:center;font-weight:600;font-size:13px;text-align:center}
+.wg.trip{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.wg.trip .btn{padding:6px 10px;font-size:12px;border-radius:8px}
+.c2{grid-column:span 2}.c4{grid-column:span 4}
+.wlist{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 24px;margin-top:16px;font-size:12.5px}
+.wlist div{display:flex;flex-direction:column;gap:2px}
+.wlist b{font-weight:600}
+.wlist span{color:var(--muted)}
+.wrap{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}}
+</style>
+<div class="widgets">
+  <h2>Home screen widgets</h2>
+  <p>Widgets cut the common jobs to one tap from the home screen. Each one deep-links straight into the screen it names, so the fill-up form opens with the keyboard up and the trip recorder starts without opening the app first.</p>
+  <div class="wrap">
+    <div class="home" aria-label="Android home screen with four widgets">
+      <div class="wg cta c2">+ Log fill-up</div>
+      <div class="wg c2"><div class="k">Last tank</div><div class="v">9.7 <small>L/100 km</small></div><div class="k">23 Sep · 148,304 km</div></div>
+      <div class="wg trip c4"><div><div class="k">Trip</div><div class="v" style="font-size:15px">Not recording</div></div><div class="btn">▶ Start trip</div></div>
+      <div class="wg c2"><div class="k">This year</div><div class="v">3,931 <small>km</small></div><div class="k">$1,060 · 9.3 L/100</div></div>
+      <div class="wg c2"><div class="k">Next</div><div class="v" style="font-size:14px">WOF due</div><div class="k">14 Nov · 8 days</div></div>
+    </div>
+    <div class="wlist">
+      <div><b>Log fill-up (2×1)</b><span>Opens the form on Odometer. The most-used action gets the biggest target.</span></div>
+      <div><b>Last tank (2×1)</b><span>Economy from the latest fill, refreshed after each save. Tap opens History.</span></div>
+      <div><b>Trip control (4×1)</b><span>Start, pause and end a trip without unlocking the app. While recording it shows elapsed time, km and battery mode, and the same controls sit in the recorder's notification.</span></div>
+      <div><b>This year (2×1)</b><span>km, spend and average for the calendar year. Tap opens the dashboard.</span></div>
+      <div><b>Next reminder (2×1)</b><span>WOF, rego or insurance from the expense records, with days remaining. Tap opens the expense.</span></div>
+      <div><b>Quick-settings tile</b><span>A "Start trip" tile in the Android quick settings shade, for when the home screen is not handy.</span></div>
+    </div>
+  </div>
+
+  <style>
+  .vstyles{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:28px}
+  .vstyles h3{font-size:14px;font-weight:600;margin:0 0 2px}
+  .vstyles p{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .home.s2{background:linear-gradient(160deg,#c9d9cf,#8fb3a0)}
+  .home.s3{background:linear-gradient(160deg,#1a1f2b,#0b0d13)}
+  .home.s4{background:linear-gradient(160deg,#e2d6c3,#b89f7a)}
+  .wg.tint{background:#dfeee4;color:#15301f;box-shadow:none}
+  .wg.tint .k{color:#4a6b57}
+  .wg.tint.cta{background:#2f6b4a;color:#eaf5ec}
+  .wg.glass{background:rgba(255,255,255,.08);color:#f0f3ee;border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);box-shadow:none}
+  .wg.glass .k{color:#9fb0a4}
+  .wg.glass.cta{background:#5fbf84;color:#0f1a13;border:none}
+  .wg.glass .v small{color:#9fb0a4}
+  .wg.paper{background:#fbf7ef;color:#2b2419;box-shadow:0 1px 0 rgba(0,0,0,.15);border-radius:6px}
+  .wg.paper .k{color:#8a7a62}
+  .wg.paper.cta{background:#2b2419;color:#fbf7ef}
+  .wg.paper .v{font-family:var(--mono)}
+  .hero{grid-column:span 4;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+  .hero .big{font-family:var(--mono);font-size:30px;font-weight:500;line-height:1}
+  .hero .big small{font-size:11px;font-family:var(--display)}
+  .hero .go{border-radius:999px;padding:8px 12px;font-size:12px;font-weight:600;white-space:nowrap}
+  </style>
+  <h3 style="font-size:15px;margin:28px 0 2px">Widget visual styles</h3>
+  <p style="color:var(--muted);font-size:13px;margin:0 0 14px;max-width:65ch">The same information in four treatments. Android 12+ can tint any of them from the wallpaper (Material You), so the colours shown are the untinted defaults.</p>
+  <div class="vstyles">
+
+    <div>
+      <h3>1 · Clean cards (above)</h3>
+      <p>White tiles with a green action tile. Safest on any wallpaper; the figures do the work.</p>
+      <div class="home" style="max-width:none">
+        <div class="wg cta c2">+ Log fill-up</div>
+        <div class="wg c2"><div class="k">Last tank</div><div class="v">9.7 <small>L/100 km</small></div></div>
+      </div>
+    </div>
+
+    <div>
+      <h3>2 · Tinted (Material You)</h3>
+      <p>Soft green surfaces that take the wallpaper's hue on Android 12+, so the widgets look like part of the phone rather than a bolt-on.</p>
+      <div class="home s2" style="max-width:none">
+        <div class="wg tint cta c2">+ Log fill-up</div>
+        <div class="wg tint c2"><div class="k">Last tank</div><div class="v">9.7 <small>L/100 km</small></div></div>
+        <div class="wg tint c4 trip"><div><div class="k">Trip</div><div class="v" style="font-size:14px">Recording · 1:38 · 148 km</div></div><div class="btn" style="background:#2f6b4a;color:#eaf5ec;padding:6px 10px;font-size:12px;border-radius:8px">■ End</div></div>
+      </div>
+    </div>
+
+    <div>
+      <h3>3 · Dark glass</h3>
+      <p>Translucent panels with the icon's mint accent, for dark wallpapers and night driving. The gauge from the icon becomes the hero widget.</p>
+      <div class="home s3" style="max-width:none">
+        <div class="wg glass hero">
+          <svg width="52" height="52" viewBox="0 0 108 108" aria-label="Gauge">
+            <path d="M22 70 A34 34 0 0 1 86 70" fill="none" stroke="#3b4a40" stroke-width="9" stroke-linecap="round"/>
+            <path d="M22 70 A34 34 0 0 1 58 36" fill="none" stroke="#5fbf84" stroke-width="9" stroke-linecap="round"/>
+            <line x1="54" y1="70" x2="58" y2="40" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="54" cy="70" r="5.5" fill="#fff"/>
+          </svg>
+          <div><div class="k">Last tank</div><div class="big">9.7 <small>L/100 km · $34/100</small></div></div>
+          <div class="go" style="background:#5fbf84;color:#0f1a13">+ Fill</div>
+        </div>
+        <div class="wg glass c2"><div class="k">This year</div><div class="v">3,931 <small>km</small></div></div>
+        <div class="wg glass c2"><div class="k">Trip</div><div class="v" style="font-size:14px">▶ Start</div></div>
+      </div>
+    </div>
+
+    <div>
+      <h3>4 · Logbook paper</h3>
+      <p>Square-cornered cream cards with mono figures, like a paper logbook page. Distinctive, and the odometer-style numbers tie back to icon option B.</p>
+      <div class="home s4" style="max-width:none">
+        <div class="wg paper cta c2">+ Log fill-up</div>
+        <div class="wg paper c2"><div class="k">Odometer</div><div class="v">148,304</div></div>
+        <div class="wg paper c2"><div class="k">Last tank</div><div class="v">9.7 <small>L/100</small></div></div>
+        <div class="wg paper c2"><div class="k">WOF due</div><div class="v" style="font-size:14px">14 Nov</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="flow">
+  <h2>How the screens connect</h2>
+  <ol>
+    <li>First launch: sign in to Google, pick the Mileage sheet, preview the 10 rows, import. The dashboard then shows the real lifetime numbers.</li>
+    <li>At the pump: Dashboard → Log a fill-up → Save. The row is queued and appended to the sheet when there is signal.</li>
+    <li>Road trip: Trips tab → Start trip (type the odometer) → drive → End trip (type the odometer). Fill-ups saved during a trip become stops.</li>
+    <li>Later: History shows everything, Export re-sends the sheet tabs or a Dropbox backup, and the EV appears as a second vehicle with the same screens in blue.</li>
+  </ol>
+</div>

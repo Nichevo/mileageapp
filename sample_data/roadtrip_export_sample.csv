@@ -1,0 +1,39 @@
+ROAD TRIP CSV ",."
+Version,Language
+2000,en
+
+
+FUEL RECORDS
+Odometer (km),Trip Distance,Date,Fill Amount,Fill Units,Price per Unit,Total Price,Partial Fill,L/100 km,Note,Octane,Location,Payment,Conditions,Reset,Categories,Flags,Currency Code,Currency Rate,Latitude,Longitude,ID,Trip Comp Fuel Economy,Trip Comp Avg. Speed,Trip Comp Temperature,Trip Comp Drive Time,Tank Number
+48000,,"2025-6-2 15:59",41.5,L,2.4990,103.71,,,,,,,,Reset,,9,,1,,,1,,,,,0
+48510.4,510.4,"2025-6-19 9:52",40.10,L,2.5590,102.62,,7.8566,,,,,,,,0,,1,,,2,,,,,0
+49002.0,491.6,"2025-7-7 15:47",39.85,L,2.4890,99.19,,8.1062,,"95",,,,,,2,,1,-36.85,174.76,3,,,,,0
+49380.5,378.5,"2025-7-29 6:13",19.00,L,2.5190,47.86,Partial,,,,,,,,,2,,1,-36.85,174.76,4,,,,,0
+49890.2,509.7,"2025-8-14 17:21",42.30,L,2.5390,107.40,,8.2990,,,"Sample Town",,,,,2,,1,-37.79,175.28,5,,,,,0
+
+
+MAINTENANCE RECORDS
+Description,Date,Odometer (km),Cost,Note,Location,Type,Subtype,Payment,Categories,Reminder Interval,Reminder Distance,Flags,Currency Code,Currency Rate,Latitude,Longitude,ID,Notification Interval,Notification Distance
+"Insurance Payment","2025-6-16",48000,720.00,,,Expense,,,,"1y",,64,,1,,,1,"1w",100
+"Rego","2025-7-1",48510.4,110.00,,,Expense,,,,"12m",,64,,1,,,2,"1w",100
+"Wof","2025-8-20",49890.2,69.00,,"Sample Testing Station",Expense,,,,"12m",,64,,1,,,3,"1w",100
+"Tires","2025-8-21",49890.2,780.00,,,Service,,,,,,0,,1,,,4,,
+
+
+ROAD TRIPS
+Name,Start Date,Start Odometer (km),End Date,End Odometer,Note,Distance,ID,Type,Categories,Flags
+"Winter 2025","2025-6-1",48000,"2025-8-31",49890.2,,1890.2,1,Report,,14
+
+
+VEHICLE
+Name,Odometer,Units,Notes,Tank Capacity,Tank Units,Home Currency,Flags,IconID,FuelUnits,TripComp Units,TripComp Speed,TripComp Temperature,TripComp Time Enabled,Odometer Shift
+"Sample Car","km","L/100 km","",45,L,NZD,1,0,1,,,,,
+
+
+TIRE LOG
+Name,Start Date,Start Odometer (km),Size,Size Correction,Distance,Age,Note,Flags,ID,ParentID
+"4x Sample Tyres","2025-8-21",49890.2,,,0,"0 days",,0,1,0
+
+
+VALUATIONS
+Type,Date,Odometer,Price,Notes,Flags
