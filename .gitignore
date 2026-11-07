@@ -1,5 +1,5 @@
 # --- Personal data: never committed ---
-data/
+/data/
 exports/
 backups/
 *.db
