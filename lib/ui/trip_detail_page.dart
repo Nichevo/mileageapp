@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -167,7 +169,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           ),
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
-                          if (_stats != null) ..._statsSection(context, _stats!, road) else _reportSection(context, trip),
+                          if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
                           if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
                         ],
                       ),
@@ -179,7 +181,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     );
   }
 
-  List<Widget> _statsSection(BuildContext context, TripStats s, RoadStats? road) {
+  List<Widget> _statsSection(BuildContext context, TripStats s, RoadStats? road, TripBattery? battery) {
     final t = Theme.of(context).textTheme;
     final litres = _fuel == null ? null : s.distanceKm * _fuel!.per100 / 100;
     final tiles = <(String, String)>[
@@ -199,6 +201,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
       ('Climb', '${s.elevationGainM.round()} m'),
       ('Harsh braking', '${s.harshBrakes}'),
       ('Hard acceleration', '${s.harshAccels}'),
+      if (battery != null) ('Phone battery used', battery.describe(s.total)),
       if (litres != null) ('Fuel (estimate)', '${litres.toStringAsFixed(1)} L · ${fmtMoney(litres * _fuel!.price)}'),
     ];
     return [
@@ -332,5 +335,28 @@ class RoadBar extends StatelessWidget {
           ]),
       ]),
     ]);
+  }
+}
+
+/// Phone battery at the start and end of a recorded trip.
+class TripBattery {
+  final int start, end;
+  final bool charging;
+  const TripBattery(this.start, this.end, this.charging);
+
+  static TripBattery? from(String? statsJson) {
+    if (statsJson == null) return null;
+    final b = (jsonDecode(statsJson) as Map<String, Object?>)['battery'];
+    if (b is! Map || b['start'] is! num || b['end'] is! num) return null;
+    return TripBattery((b['start'] as num).toInt(), (b['end'] as num).toInt(), b['charging'] == true);
+  }
+
+  int get used => start - end;
+
+  /// "3% · 2.6% per hour", or "Charging (60% to 72%)".
+  String describe(Duration total) {
+    if (charging) return 'Charging ($start% to $end%)';
+    final perHour = total.inMinutes >= 10 ? ' · ${(used / (total.inMinutes / 60)).toStringAsFixed(1)}% per hour' : '';
+    return '${used <= 0 ? 0 : used}%$perHour';
   }
 }

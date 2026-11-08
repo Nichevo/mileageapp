@@ -24,7 +24,9 @@ void main() {
     final v = await repo.ensureVehicle();
     await settings.setActiveVehicleId(v.id);
     final samples = drive(174.700, 174.730, stopAt: [174.7097]);
-    final json = computeTripStats(samples).toJson()..['road'] = matchRoads(samples, area()).toJson();
+    final json = computeTripStats(samples).toJson()
+      ..['road'] = matchRoads(samples, area()).toJson()
+      ..['battery'] = {'start': 80, 'end': 76, 'charging': false};
     await repo.saveRecordedTrip(
       TripsCompanion.insert(id: 't1', vehicleId: v.id, name: 'Morning drive', startAt: samples.first.at, status: const Value('done'), statsJson: Value(jsonEncode(json))),
       [for (final s in samples) TripPointsCompanion.insert(tripId: 't1', at: s.at, lat: s.lat, lon: s.lon, speedMps: Value(s.speedMps), accuracyM: Value(s.accuracyM))],
@@ -36,6 +38,7 @@ void main() {
     }
     await tester.scrollUntilVisible(find.text('Road types'), 200);
     expect(find.text('1 red of 2'), findsOneWidget);
+    expect(find.text('4%'), findsOneWidget);
     expect(find.textContaining('Highway / main road 100%'), findsOneWidget);
     expect(find.textContaining('stopped at 1'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());

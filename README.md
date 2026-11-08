@@ -77,3 +77,11 @@ scripts/         privacy check and helpers
 ## Fuel prices
 
 `lib/prices/national_prices.dart` downloads MBIE's public weekly fuel price monitoring table (national average board price per fuel, in cents per litre) at most every three days and keeps a copy on the phone. `lib/domain/prices.dart` compares each fill-up with the national average for its week and ranks your stations by their average difference. Gaspy has no public API, so the app only opens Gaspy (package `nz.hwem.gaspy`) for live station prices.
+
+## Plate lookup
+
+More > Vehicle can fill in the car's details from its number plate using CarJam's ABCD API (`lib/vehicle/carjam_client.dart`) with the user's own API key, entered in the app and kept on the phone. Lookups are charged to that CarJam account. The WOF and registration expiry dates it returns can set the reminder due dates. Without a key, "Open on CarJam" opens the free web page instead. The plate is stored only in the phone's settings.
+
+## Battery
+
+The trip recorder notes the phone's battery % at the start and end of each trip, and whether it was charging, so the trip page shows what recording actually cost.

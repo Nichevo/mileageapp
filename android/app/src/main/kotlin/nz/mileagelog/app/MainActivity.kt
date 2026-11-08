@@ -109,6 +109,14 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(true)
                 }
+                "openUrl" -> {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(call.argument<String>("url"))))
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("open_failed", e.message, null)
+                    }
+                }
                 "openApp" -> {
                     // Opens another app, or its Play Store page when it isn't installed.
                     val pkg = call.argument<String>("package") ?: ""

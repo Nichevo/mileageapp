@@ -223,18 +223,22 @@ class _PriceChart extends StatelessWidget {
         if (!w.week.isBefore(from) && !w.week.isAfter(to)) FlSpot(x(w.week), w.centsPerL / 100),
     ];
     final dots = [for (final f in fills) FlSpot(x(f.at), f.paidCents / 100)];
-    final fmt = DateFormat('MMM yy');
+    final fmt = DateFormat('MMM-yy');
+    final side = SideTitles(
+      showTitles: true,
+      reservedSize: 40,
+      interval: 0.1,
+      getTitlesWidget: (v, m) => Text('\$${v.toStringAsFixed(2)}', style: const TextStyle(fontSize: 10)),
+    );
     return LineChart(LineChartData(
       minX: 0,
       maxX: x(to),
-      gridData: const FlGridData(show: true, drawVerticalLine: false),
+      gridData: const FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 0.1),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(),
-        rightTitles: const AxisTitles(),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (v, m) => Text('\$${v.toStringAsFixed(2)}', style: const TextStyle(fontSize: 10))),
-        ),
+        leftTitles: AxisTitles(sideTitles: side),
+        rightTitles: AxisTitles(sideTitles: side),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,

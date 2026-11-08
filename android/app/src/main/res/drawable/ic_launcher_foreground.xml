@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App icon, design A: gauge needle sweeping from a fuel nozzle to a bolt. Source: docs/icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M22,70 A34,34 0 0,1 86,70" android:strokeColor="#EAF5EC" android:strokeWidth="7" android:strokeLineCap="round"/>
+    <path android:pathData="M22,70 A34,34 0 0,1 40,41" android:strokeColor="#9FE0B7" android:strokeWidth="7" android:strokeLineCap="round"/>
+    <path android:pathData="M54,70 L43,46" android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round"/>
+    <path android:pathData="M48.5,70 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0z" android:fillColor="#FFFFFF"/>
+    <path android:pathData="M26,86h8v-12h-8zM34,76h3v10h-3z" android:fillColor="#EAF5EC"/>
+    <path android:pathData="M76,73l-4,8h4l-2,7 7,-10h-4l3,-5z" android:fillColor="#ffd166"/>
+</vector>

@@ -47,6 +47,12 @@ class MileageApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
           useMaterial3: true,
         ),
+        // Keep every page clear of the phone's navigation bar. The strip
+        // underneath matches the bottom menu's colour.
+        builder: (context, child) => ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          child: SafeArea(top: false, left: false, right: false, child: child ?? const SizedBox()),
+        ),
         home: const Shell(),
       ),
     );

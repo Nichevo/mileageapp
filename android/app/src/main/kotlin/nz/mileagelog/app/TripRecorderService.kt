@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -173,7 +174,10 @@ class TripRecorderService : Service(), LocationListener {
             startedAtMs = j.optLong("startAt", System.currentTimeMillis())
         } else {
             startedAtMs = System.currentTimeMillis()
-            meta.writeText(JSONObject().put("id", id).put("startAt", startedAtMs).put("startedBy", startedBy).toString())
+            val m = JSONObject().put("id", id).put("startAt", startedAtMs).put("startedBy", startedBy)
+            batteryPct()?.let { m.put("batteryStart", it) }
+            if (isCharging()) m.put("charging", true)
+            meta.writeText(m.toString())
         }
         writer = FileWriter(csv, true)
         distanceM = 0.0
@@ -207,9 +211,13 @@ class TripRecorderService : Service(), LocationListener {
         tripId?.let { id ->
             val meta = File(tripsDir(this), "$id.meta.json")
             val j = if (meta.exists()) JSONObject(meta.readText()) else JSONObject().put("id", id)
-            meta.writeText(j.put("endAt", System.currentTimeMillis()).toString())
+            j.put("endAt", System.currentTimeMillis())
+            batteryPct()?.let { j.put("batteryEnd", it) }
+            if (chargedDuringTrip || isCharging()) j.put("charging", true)
+            meta.writeText(j.toString())
         }
         tripId = null
+        chargedDuringTrip = false
         prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("liveKm").remove("liveStartMs").apply()
         HomeWidgets.updateTrip(this)
         if (!keepService) {
@@ -263,8 +271,24 @@ class TripRecorderService : Service(), LocationListener {
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) { notifyNow("GPS is turned off") }
 
+    // Battery use per trip, so the cost of recording can be seen, not guessed.
+    private var chargedDuringTrip = false
+
+    private fun batteryPct(): Int? = try {
+        getSystemService(BatteryManager::class.java).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).takeIf { it in 0..100 }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun isCharging(): Boolean = try {
+        getSystemService(BatteryManager::class.java).isCharging
+    } catch (e: Exception) {
+        false
+    }
+
     private fun notifyNow(text: String?) {
         lastNotifyElapsed = SystemClock.elapsedRealtime()
+        if (tripId != null && isCharging()) chargedDuringTrip = true
         if (tripId != null) {
             prefs(this).edit().putFloat("liveKm", (distanceM / 1000).toFloat()).apply()
             HomeWidgets.updateTrip(this)

@@ -125,7 +125,7 @@ class TripRecorder {
             status: const Value('done'),
             notes: Value(existing?.notes),
             startedBy: Value(startedBy),
-            statsJson: Value(jsonEncode(stats.toJson())),
+            statsJson: Value(jsonEncode({...stats.toJson(), ...?batteryJson(meta)})),
           ),
           [
             for (final s in samples)
@@ -158,4 +158,15 @@ class TripRecorder {
     }
     return finished;
   }
+}
+
+/// Battery readings the recorder saved in a trip's meta file, for the
+/// trip's stats: {'battery': {'start': 82, 'end': 77, 'charging': false}}.
+Map<String, Object?>? batteryJson(Map<String, dynamic> meta) {
+  final start = (meta['batteryStart'] as num?)?.toInt();
+  final end = (meta['batteryEnd'] as num?)?.toInt();
+  if (start == null || end == null) return null;
+  return {
+    'battery': {'start': start, 'end': end, 'charging': meta['charging'] == true},
+  };
 }

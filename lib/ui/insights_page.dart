@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +19,7 @@ class InsightsPage extends StatefulWidget {
 class _InsightsPageState extends State<InsightsPage> {
   int _rangeMonths = 12; // 0 = all
   Period _period = Period.month;
+  bool _log = false;
 
   @override
   Widget build(BuildContext context) {
@@ -79,28 +82,36 @@ class _InsightsPageState extends State<InsightsPage> {
                 selected: {_period},
                 onSelectionChanged: (s) => setState(() => _period = s.first),
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilterChip(
+                  label: const Text('Log scale'),
+                  selected: _log,
+                  onSelected: (v) => setState(() => _log = v),
+                ),
+              ),
               const SizedBox(height: 12),
               _ChartCard(
                 title: 'Distance per $unit · km',
                 caption: '${fmtKm(totalKm)} km in this range'
                     '${busiest == null || busiest.km == 0 ? '' : ', most in ${_fullLabel(busiest.start)} (${fmtKm(busiest.km)} km)'}. '
                     'Distance between two fill-ups is spread evenly over the days between them.',
-                child: _bars(series((t) => t.km), cs.primary),
+                child: _bars(series((t) => t.km), cs.primary, log: _log),
               ),
               _ChartCard(
                 title: 'Fuel spend per $unit · \$',
                 caption: '${fmtMoney0(totalCost)} in this range',
-                child: _bars(series((t) => t.cost), cs.tertiary),
+                child: _bars(series((t) => t.cost), cs.tertiary, log: _log),
               ),
               _ChartCard(
                 title: 'Cost per 100 km · \$ per $unit',
                 caption: totalKm > 0 ? 'Average \$${(totalCost / totalKm * 100).toStringAsFixed(2)} per 100 km over the range' : '',
-                child: _bars(series((t) => t.costPer100), cs.tertiary),
+                child: _bars(series((t) => t.costPer100), cs.tertiary, log: _log),
               ),
               _ChartCard(
                 title: 'Price per litre · \$ per $unit',
                 caption: 'Average of the fill-ups made in each $unit. Empty bars had no fill-up.',
-                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2),
+                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, log: _log),
               ),
               _ChartCard(
                 title: 'Fuel economy · L/100 km, rolling 5 fills',
@@ -124,16 +135,13 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
-  /// Short label under a bar, thinned out so labels never overlap.
+  /// Label under every bar: 3-Nov, Nov-26, 2026.
   String _axisLabel(List<PeriodTotals> ps, int i) {
-    final n = ps.length;
-    final step = (n / 7).ceil().clamp(1, 1000);
-    if (i % step != 0) return '';
     final d = ps[i].start;
     return switch (_period) {
-      Period.week => DateFormat('d MMM').format(d),
-      Period.month => n <= 12 ? DateFormat('MMM').format(d) : DateFormat("MMM ''yy").format(d),
-      Period.year => "'${d.year % 100}",
+      Period.week => DateFormat('d-MMM').format(d),
+      Period.month => DateFormat('MMM-yy').format(d),
+      Period.year => '${d.year}',
     };
   }
 
@@ -143,48 +151,97 @@ class _InsightsPageState extends State<InsightsPage> {
         Period.year => '${d.year}',
       };
 
-  Widget _bars(List<_Bar> data, Color color, {int? decimals}) {
+  /// Bar chart with a fixed value scale on the left and every bar labelled.
+  /// When the bars don't fit, the chart scrolls sideways (newest showing).
+  /// [log] plots log10(value + 1) so a few very high bars don't flatten the rest.
+  Widget _bars(List<_Bar> data, Color color, {int? decimals, bool log = false}) {
     if (data.isEmpty) return const SizedBox();
-    final maxV = data.map((d) => d.value).fold(0.0, (a, b) => a > b ? a : b);
-    final width = data.length > 40 ? 3.0 : data.length > 20 ? 6.0 : data.length > 12 ? 9.0 : 14.0;
-    return BarChart(
-      BarChartData(
-        maxY: maxV == 0 ? 1 : maxV * 1.15,
-        alignment: BarChartAlignment.spaceAround,
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(),
-          rightTitles: const AxisTitles(),
-          leftTitles: const AxisTitles(),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              getTitlesWidget: (v, meta) {
-                final i = v.toInt();
-                if (i < 0 || i >= data.length || data[i].label.isEmpty) return const SizedBox();
-                return Text(data[i].label, style: const TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.visible, softWrap: false);
-              },
+    final maxV = data.map((d) => d.value).fold(0.0, math.max);
+    final scale = ChartScale.of(maxV, log: log);
+    final rotate = data.any((d) => d.label.length > 3);
+    final bottomH = rotate ? 46.0 : 20.0;
+    const axisW = 44.0;
+    const labelStyle = TextStyle(fontSize: 10);
+    return LayoutBuilder(builder: (context, box) {
+      final plotH = box.maxHeight - bottomH;
+      // The same scale on both sides, so long or scrolled charts are easy to read.
+      Widget axis({required bool left}) => SizedBox(
+            width: axisW,
+            height: box.maxHeight,
+            child: Stack(children: [
+              for (final (v, pos) in scale.ticks)
+                Positioned(
+                  left: left ? 0 : 6,
+                  right: left ? 6 : 0,
+                  top: (plotH * (1 - pos / scale.top) - 7).clamp(0.0, plotH),
+                  child: Text(scale.label(v), style: labelStyle, textAlign: left ? TextAlign.right : TextAlign.left),
+                ),
+            ]),
+          );
+      final minSlot = rotate ? 20.0 : 14.0;
+      final room = box.maxWidth - axisW * 2;
+      final width = math.max(room, data.length * minSlot);
+      final barW = (width / data.length * 0.6).clamp(2.0, 16.0);
+      final chart = BarChart(
+        BarChartData(
+          minY: 0,
+          maxY: scale.top,
+          alignment: BarChartAlignment.spaceAround,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            checkToShowHorizontalLine: (y) => scale.ticks.any((t) => (t.$2 - y).abs() < 1e-6),
+            horizontalInterval: scale.top / 200,
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(),
+            rightTitles: const AxisTitles(),
+            leftTitles: const AxisTitles(),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: bottomH,
+                getTitlesWidget: (v, meta) {
+                  final i = v.toInt();
+                  if (i < 0 || i >= data.length || data[i].label.isEmpty) return const SizedBox();
+                  final text = Text(data[i].label, style: labelStyle, maxLines: 1, softWrap: false);
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: rotate ? RotatedBox(quarterTurns: 3, child: text) : text,
+                  );
+                },
+              ),
             ),
           ),
-        ),
-        barTouchData: BarTouchData(
-          touchTooltipData: BarTouchTooltipData(
-            fitInsideHorizontally: true,
-            fitInsideVertically: true,
-            getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
-              '${data[g.x].tooltip}\n${_fmt(rod.toY, decimals)}',
-              const TextStyle(color: Colors.white, fontSize: 12),
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+                '${data[g.x].tooltip}\n${_fmt(data[g.x].value, decimals)}',
+                const TextStyle(color: Colors.white, fontSize: 12),
+              ),
             ),
           ),
+          barGroups: [
+            for (var i = 0; i < data.length; i++)
+              BarChartGroupData(x: i, barRods: [
+                BarChartRodData(toY: scale.pos(data[i].value), color: color, width: barW, borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1)),
+              ]),
+          ],
         ),
-        barGroups: [
-          for (var i = 0; i < data.length; i++)
-            BarChartGroupData(x: i, barRods: [BarChartRodData(toY: data[i].value, color: color, width: width, borderRadius: BorderRadius.circular(width > 6 ? 3 : 1))]),
-        ],
-      ),
-    );
+      );
+      return Row(children: [
+        axis(left: true),
+        Expanded(
+          child: width <= room
+              ? chart
+              : SingleChildScrollView(scrollDirection: Axis.horizontal, reverse: true, child: SizedBox(width: width, height: box.maxHeight, child: chart)),
+        ),
+        axis(left: false),
+      ]);
+    });
   }
 
   String _fmt(double v, [int? decimals]) =>
@@ -200,15 +257,41 @@ class _InsightsPageState extends State<InsightsPage> {
       if (roll[i] != null) line.add(FlSpot(i.toDouble(), roll[i]!));
     }
     if (dots.length < 2) return const Center(child: Text('Need two full fills'));
+    final ys = dots.map((d) => d.y);
+    final lo = ys.reduce(math.min), hi = ys.reduce(math.max);
+    final step = ChartScale.niceStep(math.max(hi - lo, 1) / 4);
+    final minY = (lo / step).floor() * step, maxY = (hi / step).ceil() * step;
+    const style = TextStyle(fontSize: 10);
+    final sideY = SideTitles(
+      showTitles: true,
+      reservedSize: 34,
+      interval: step,
+      getTitlesWidget: (v, meta) => Text(v.toStringAsFixed(step < 1 ? 1 : 0), style: style),
+    );
+    // Dates under about five evenly spaced tanks.
+    final every = math.max(1, (stats.length / 5).ceil());
     return LineChart(
       LineChartData(
-        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
+        minY: minY,
+        maxY: maxY == minY ? minY + step : maxY,
+        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: step),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(),
-          rightTitles: const AxisTitles(),
-          bottomTitles: const AxisTitles(),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, interval: 1)),
+          leftTitles: AxisTitles(sideTitles: sideY),
+          rightTitles: AxisTitles(sideTitles: sideY),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 20,
+              interval: 1,
+              getTitlesWidget: (v, meta) {
+                final i = v.round();
+                if (i != v || i < 0 || i >= stats.length || i % every != 0) return const SizedBox();
+                return Padding(padding: const EdgeInsets.only(top: 4), child: Text(DateFormat('MMM-yy').format(stats[i].fill.at), style: style));
+              },
+            ),
+          ),
         ),
         lineBarsData: [
           LineChartBarData(spots: dots, color: color.withValues(alpha: 0.35), barWidth: 0, dotData: const FlDotData(show: true)),
@@ -269,11 +352,51 @@ class _ChartCard extends StatelessWidget {
           children: [
             Text(title.toUpperCase(), style: t.labelSmall),
             const SizedBox(height: 8),
-            SizedBox(height: 150, child: child),
+            SizedBox(height: 190, child: child),
             if (caption.isNotEmpty) ...[const SizedBox(height: 6), Text(caption, style: t.bodySmall)],
           ],
         ),
       ),
     );
+  }
+}
+
+/// Value axis for the bar charts: round-number ticks, linear or log.
+class ChartScale {
+  final bool log;
+  final double top; // in plotted units
+  final double step; // linear tick step (1 decade for log)
+  final List<(double value, double pos)> ticks;
+  const ChartScale._(this.log, this.top, this.step, this.ticks);
+
+  String label(double v) {
+    if (log) return v >= 1000 ? '${(v / 1000).round()}k' : v.toStringAsFixed(0);
+    if (step < 1) return v.toStringAsFixed((step * 10).roundToDouble() == step * 10 ? 1 : 2);
+    if (v >= 10000) return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
+    return NumberFormat.decimalPattern('en_NZ').format(v.round());
+  }
+
+  double pos(double v) => log ? math.log(math.max(v, 0) + 1) / math.ln10 : v;
+
+  static double niceStep(double rough) {
+    if (rough <= 0) return 1;
+    final mag = math.pow(10, (math.log(rough) / math.ln10).floor()).toDouble();
+    final f = rough / mag;
+    final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    return nice * mag;
+  }
+
+  factory ChartScale.of(double maxV, {bool log = false}) {
+    if (log) {
+      final decades = math.max(1, (math.log(math.max(maxV, 0) + 1) / math.ln10).ceil());
+      return ChartScale._(true, decades.toDouble(), 1, [
+        (0, 0),
+        for (var k = 1; k <= decades; k++) (math.pow(10, k).toDouble(), math.log(math.pow(10, k) + 1) / math.ln10),
+      ]);
+    }
+    final step = niceStep(maxV / 4);
+    var top = (maxV / step).ceil() * step;
+    if (top <= 0) top = step;
+    return ChartScale._(false, top.toDouble(), step, [for (var v = 0.0; v <= top + step / 1000; v += step) (v, v)]);
   }
 }

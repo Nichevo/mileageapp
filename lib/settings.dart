@@ -41,6 +41,16 @@ class Settings {
   bool get roadLookup => _p.getBool('roadLookup') ?? true;
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
 
+  /// The car's number plate, per vehicle. Kept on the phone only.
+  String? plateFor(String vehicleId) => _p.getString('plate_$vehicleId');
+  Future<void> setPlate(String vehicleId, String? plate) async =>
+      plate == null || plate.isEmpty ? await _p.remove('plate_$vehicleId') : await _p.setString('plate_$vehicleId', plate);
+
+  /// The user's own CarJam API key for plate lookups.
+  String? get carjamKey => _p.getString('carjamKey');
+  Future<void> setCarjamKey(String? k) async =>
+      k == null || k.trim().isEmpty ? await _p.remove('carjamKey') : await _p.setString('carjamKey', k.trim());
+
   bool get useGps => _p.getBool('useGps') ?? true;
   Future<void> setUseGps(bool v) => _p.setBool('useGps', v);
 

@@ -1,16 +1,25 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 import '../app.dart';
 import '../data/database.dart';
+import '../data/repository.dart';
+import '../domain/carjam.dart';
+import '../vehicle/carjam_client.dart';
+import 'format.dart';
 
 class VehiclePage extends StatefulWidget {
-  const VehiclePage({super.key});
+  /// For tests: the HTTP client used for CarJam lookups.
+  final http.Client? carjamClient;
+  const VehiclePage({super.key, this.carjamClient});
   @override
   State<VehiclePage> createState() => _VehiclePageState();
 }
 
 class _VehiclePageState extends State<VehiclePage> {
+  final _plate = TextEditingController();
   final _name = TextEditingController();
   final _make = TextEditingController();
   final _model = TextEditingController();
@@ -19,6 +28,10 @@ class _VehiclePageState extends State<VehiclePage> {
   final _rated = TextEditingController();
   final _notes = TextEditingController();
   Vehicle? _v;
+  CarDetails? _found;
+  bool _looking = false;
+  bool _datesApplied = false;
+  String? _error;
 
   @override
   void initState() {
@@ -32,6 +45,7 @@ class _VehiclePageState extends State<VehiclePage> {
     if (v == null || !mounted) return;
     setState(() {
       _v = v;
+      _plate.text = scope.settings.plateFor(v.id) ?? '';
       _name.text = v.name;
       _make.text = v.make ?? '';
       _model.text = v.model ?? '';
@@ -44,6 +58,7 @@ class _VehiclePageState extends State<VehiclePage> {
 
   Future<void> _save() async {
     final scope = AppScope.of(context);
+    await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
     await scope.repo.saveVehicle(VehiclesCompanion(
       id: Value(_v!.id),
       name: Value(_name.text.trim().isEmpty ? 'My car' : _name.text.trim()),
@@ -59,8 +74,94 @@ class _VehiclePageState extends State<VehiclePage> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _lookup() async {
+    final scope = AppScope.of(context);
+    var key = scope.settings.carjamKey;
+    if (key == null) {
+      key = await _askKey();
+      if (key == null || !mounted) return;
+    }
+    setState(() {
+      _looking = true;
+      _error = null;
+    });
+    try {
+      final d = await CarJamClient.lookup(_plate.text, key, client: widget.carjamClient);
+      await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
+      if (!mounted) return;
+      setState(() {
+        _found = d;
+        _datesApplied = false;
+        if (d.make != null) _make.text = d.summaryMake;
+        if (d.model != null) _model.text = d.summaryModel;
+        if (d.year != null) _year.text = '${d.year}';
+        if (d.ratedPer100 != null && _rated.text.trim().isEmpty) _rated.text = d.ratedPer100!.toStringAsFixed(1);
+        if (_name.text.trim().isEmpty || _name.text == 'My car') _name.text = [d.summaryMake, d.summaryModel].where((s) => s.isNotEmpty).join(' ');
+      });
+    } on CarJamException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _looking = false);
+    }
+  }
+
+  Future<String?> _askKey() async {
+    final scope = AppScope.of(context);
+    final ctl = TextEditingController(text: scope.settings.carjamKey ?? '');
+    final t = Theme.of(context).textTheme;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('CarJam API key'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              'Plate lookups use CarJam, which charges about 21c + GST a lookup (more when it checks the government register). '
+              'To get a key:\n'
+              '1. Register at carjam.co.nz (Members).\n'
+              '2. On the developer page, apply for a Development Connection. CarJam approves it, usually within a business day.\n'
+              '3. Generate an API key and paste it here.\n\n'
+              'The key is kept on this phone only.',
+              style: t.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            TextField(controller: ctl, decoration: const InputDecoration(labelText: 'API key', border: OutlineInputBorder())),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok != true) return null;
+    await scope.settings.setCarjamKey(ctl.text);
+    if (mounted) setState(() {});
+    return scope.settings.carjamKey;
+  }
+
+  Future<void> _openCarJam() async {
+    try {
+      await const MethodChannel('mileagelog/trips').invokeMethod('openUrl', {'url': CarJamClient.pageFor(_plate.text).toString()});
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Couldn\'t open the browser')));
+    }
+  }
+
+  /// Sets the WOF and rego items so they fall due on CarJam's expiry dates.
+  Future<void> _applyDates() async {
+    final d = _found!;
+    final repo = AppScope.of(context).repo;
+    await applyExpiryDates(repo, _v!.id, wofExpiry: d.wofExpiry, regoExpiry: d.licenceExpiry, oldCar: (d.year ?? 9999) < 2000);
+    if (!mounted) return;
+    setState(() => _datesApplied = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WOF and rego reminders updated')));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final hasKey = AppScope.of(context).settings.carjamKey != null;
     return Scaffold(
       appBar: AppBar(title: const Text('Vehicle')),
       body: _v == null
@@ -68,6 +169,39 @@ class _VehiclePageState extends State<VehiclePage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Text('Look up by number plate', style: t.titleSmall),
+                const SizedBox(height: 8),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _plate,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(labelText: 'Plate', helperText: 'Kept on this phone', border: OutlineInputBorder()),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: FilledButton.icon(
+                      onPressed: _looking || normalisePlate(_plate.text).isEmpty ? null : _lookup,
+                      icon: _looking
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.search),
+                      label: const Text('Look up'),
+                    ),
+                  ),
+                ]),
+                Wrap(spacing: 4, children: [
+                  TextButton(
+                    onPressed: normalisePlate(_plate.text).isEmpty ? null : _openCarJam,
+                    child: const Text('Open on CarJam (free)'),
+                  ),
+                  TextButton(onPressed: _askKey, child: Text(hasKey ? 'Change API key' : 'Set up API key')),
+                ]),
+                if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_error!, style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error))),
+                if (_found != null) _foundCard(context, _found!),
+                const SizedBox(height: 12),
                 TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
                 Row(children: [
@@ -90,5 +224,73 @@ class _VehiclePageState extends State<VehiclePage> {
               ],
             ),
     );
+  }
+
+  Widget _foundCard(BuildContext context, CarDetails d) {
+    final t = Theme.of(context).textTheme;
+    final lines = <String>[
+      if (d.colour != null || d.bodyStyle != null) [d.colour, d.bodyStyle].whereType<String>().join(' ').toLowerCase(),
+      if (d.firstRegisteredNz != null) 'First registered in NZ ${fmtDate(d.firstRegisteredNz!)}',
+      if (d.wofExpiry != null) 'WOF expires ${fmtDate(d.wofExpiry!)}',
+      if (d.licenceExpiry != null) 'Rego expires ${fmtDate(d.licenceExpiry!)}',
+      if (d.odometerKm != null) 'Last odometer on record ${fmtKm(d.odometerKm!)} km',
+      if (d.ratedPer100 != null) 'Rated ${d.ratedPer100!.toStringAsFixed(1)} L/100 km',
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(d.summary, style: t.titleMedium),
+          const SizedBox(height: 4),
+          for (final l in lines) Text(l, style: t.bodySmall),
+          const SizedBox(height: 4),
+          Text('Filled in below. Check them and tap Save. Tank size isn\'t on the register, so add it yourself.', style: t.bodySmall),
+          if (d.wofExpiry != null || d.licenceExpiry != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _datesApplied ? null : _applyDates,
+                icon: Icon(_datesApplied ? Icons.check : Icons.event_available),
+                label: Text(_datesApplied ? 'WOF and rego reminders updated' : 'Use these dates for WOF and rego reminders'),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_plate, _name, _make, _model, _year, _tank, _rated, _notes]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+}
+
+/// Makes the WOF and rego service items fall due on the given expiry dates,
+/// creating them if they don't exist yet.
+Future<void> applyExpiryDates(Repository repo, String vehicleId, {DateTime? wofExpiry, DateTime? regoExpiry, bool oldCar = false}) async {
+  final db = repo.db;
+  final items = await (db.select(db.serviceItems)..where((s) => s.vehicleId.equals(vehicleId))).get();
+  for (final (kind, name, expiry, defaultMonths) in [
+    ('wof', 'Warrant of Fitness', wofExpiry, oldCar ? 6 : 12),
+    ('rego', 'Registration', regoExpiry, 12),
+  ]) {
+    if (expiry == null) continue;
+    final existing = items.where((i) => i.kind == kind && i.active).firstOrNull;
+    final months = existing?.intervalMonths ?? defaultMonths;
+    await repo.upsertServiceItem(ServiceItemsCompanion(
+      id: Value(existing?.id ?? newId()),
+      vehicleId: Value(vehicleId),
+      name: Value(existing?.name ?? name),
+      kind: Value(kind),
+      intervalMonths: Value(months),
+      intervalKm: Value(existing?.intervalKm),
+      lastDoneAt: Value(lastDoneForDue(expiry, months)),
+      lastDoneKm: Value(existing?.lastDoneKm),
+      notes: Value(existing?.notes),
+      active: const Value(true),
+    ));
   }
 }
