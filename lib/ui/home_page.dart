@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../domain/reminders.dart';
 import '../domain/stats.dart';
 import 'care_page.dart';
 import 'fillup_form.dart';
@@ -66,6 +67,19 @@ class _Dashboard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const ComingUpCard(),
+          if ((latestEconomyChange(stats) ?? 0) >= 0.15)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: cs.tertiaryContainer,
+              child: ListTile(
+                leading: Icon(Icons.trending_up, color: cs.onTertiaryContainer),
+                title: Text('Last tank used ${(latestEconomyChange(stats)! * 100).round()}% more fuel than usual', style: TextStyle(color: cs.onTertiaryContainer)),
+                subtitle: Text(
+                  'Lots of short trips, a heavy load or a roof rack can do it. Low tyre pressure or a dragging brake can too, so a tyre check is worth a minute.',
+                  style: TextStyle(color: cs.onTertiaryContainer),
+                ),
+              ),
+            ),
           if (events.isEmpty)
             Card(
               child: Padding(

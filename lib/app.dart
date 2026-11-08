@@ -8,6 +8,9 @@ import 'ui/insights_page.dart';
 import 'ui/more_page.dart';
 import 'ui/trips_page.dart';
 import 'trips/recorder.dart';
+import 'platform/home_sync.dart';
+import 'ui/care_page.dart';
+import 'ui/fillup_form.dart';
 
 /// Gives every page access to the repository and settings.
 class AppScope extends InheritedWidget {
@@ -57,6 +60,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _index = 0;
+  HomeSyncWatcher? _watcher;
 
   @override
   void initState() {
@@ -67,6 +71,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _watcher?.stop();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -76,12 +81,37 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _onOpen();
   }
 
+  /// Opens the screen a widget or notification asked for.
+  Future<void> _handleLaunchAction() async {
+    final action = await HomeSync.consumeLaunchAction();
+    if (action == null || !mounted) return;
+    final nav = Navigator.of(context);
+    nav.popUntil((r) => r.isFirst);
+    switch (action) {
+      case 'fillup':
+        setState(() => _index = 0);
+        nav.push(MaterialPageRoute(builder: (_) => const FillUpForm()));
+      case 'trips':
+        setState(() => _index = 2);
+      case 'care':
+        nav.push(MaterialPageRoute(builder: (_) => const CarCarePage()));
+      default:
+        setState(() => _index = 0);
+    }
+  }
+
   /// Saves any trips that finished while the app was closed, and handles the
   /// "Connected to your car, tap to start" notification.
   Future<void> _onOpen() async {
     if (!TripRecorder.supported || !mounted) return;
     final scope = AppScope.of(context);
+    if (_watcher == null) {
+      _watcher = HomeSyncWatcher(scope.repo, scope.settings)..start();
+    } else {
+      _watcher!.poke(); // dates move on; refresh widgets and reminders
+    }
     try {
+      await _handleLaunchAction();
       await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
       if (await TripRecorder.consumeStartRequest()) {
         if (mounted) setState(() => _index = 2);

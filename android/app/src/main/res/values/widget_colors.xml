@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#FFF2F7F2</color>
+    <color name="widget_text">#FF17251B</color>
+    <color name="widget_subtext">#FF4A5B4E</color>
+    <color name="widget_accent">#FF1F6F3F</color>
+    <color name="widget_on_accent">#FFFFFFFF</color>
+    <string name="widget_fillup_desc">Log a fill-up in one tap, with your last fill and range</string>
+    <string name="widget_trip_desc">Start or stop recording a trip</string>
+    <string name="widget_summary_desc">This year\'s distance and spend, and what\'s due next</string>
+</resources>

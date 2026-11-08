@@ -13,6 +13,7 @@ import '../sync/sheets_sync.dart';
 import 'format.dart';
 import 'care_page.dart';
 import 'import_page.dart';
+import 'reminder_settings_page.dart';
 import 'vehicle_page.dart';
 
 class MorePage extends StatefulWidget {
@@ -160,6 +161,15 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Car care'),
             subtitle: const Text('Service schedule, insurance, tyres'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CarCarePage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('Reminders'),
+            subtitle: Text(scope.settings.remindersEnabled ? 'On at ${TimeOfDay(hour: scope.settings.reminderHour, minute: scope.settings.reminderMinute).format(context)}' : 'Off'),
+            onTap: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReminderSettingsPage()));
+              if (mounted) setState(() {});
+            },
           ),
           ListTile(
             leading: const Icon(Icons.upload_file_outlined),

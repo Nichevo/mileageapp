@@ -18,15 +18,19 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var pendingPermission: MethodChannel.Result? = null
     private var startTripRequested = false
+    /** Screen to open, from a widget or notification: fillup, trips, care, home. */
+    private var launchAction: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         startTripRequested = intent?.getBooleanExtra("startTrip", false) == true
+        launchAction = intent?.getStringExtra("open")
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra("startTrip", false)) startTripRequested = true
+        intent.getStringExtra("open")?.let { launchAction = it }
     }
 
     private fun permissionsFor(name: String): Array<String> = when (name) {
@@ -66,6 +70,18 @@ class MainActivity : FlutterActivity() {
                 "consumeStartRequest" -> {
                     result.success(startTripRequested)
                     startTripRequested = false
+                }
+                "consumeLaunchAction" -> {
+                    result.success(launchAction)
+                    launchAction = null
+                }
+                "updateWidgets" -> {
+                    HomeWidgets.save(this, call.argument<String>("json") ?: "{}")
+                    result.success(true)
+                }
+                "scheduleReminders" -> {
+                    Reminders.schedule(this, call.argument<String>("json") ?: "[]")
+                    result.success(true)
                 }
                 "hasPermission" -> result.success(granted(call.argument<String>("name") ?: ""))
                 "requestPermission" -> {

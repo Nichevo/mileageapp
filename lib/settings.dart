@@ -22,6 +22,21 @@ class Settings {
   bool get pressurePsi => _p.getBool('pressurePsi') ?? true;
   Future<void> setPressurePsi(bool v) => _p.setBool('pressurePsi', v);
 
+  bool get remindersEnabled => _p.getBool('remindersEnabled') ?? true;
+  Future<void> setRemindersEnabled(bool v) => _p.setBool('remindersEnabled', v);
+
+  /// Time of day reminders are shown.
+  int get reminderHour => _p.getInt('reminderHour') ?? 9;
+  int get reminderMinute => _p.getInt('reminderMinute') ?? 0;
+  Future<void> setReminderTime(int hour, int minute) async {
+    await _p.setInt('reminderHour', hour);
+    await _p.setInt('reminderMinute', minute);
+  }
+
+  /// "Fuel probably getting low" reminders (needs the tank size).
+  bool get fuelReminders => _p.getBool('fuelReminders') ?? true;
+  Future<void> setFuelReminders(bool v) => _p.setBool('fuelReminders', v);
+
   bool get useGps => _p.getBool('useGps') ?? true;
   Future<void> setUseGps(bool v) => _p.setBool('useGps', v);
 

@@ -39,6 +39,8 @@ class TripRecorderService : Service(), LocationListener {
         const val ACTION_STOP = "nz.mileagelog.app.STOP_TRIP"
         const val ACTION_CAR_DISCONNECTED = "nz.mileagelog.app.CAR_DISCONNECTED"
         const val ACTION_CAR_CONNECTED = "nz.mileagelog.app.CAR_CONNECTED"
+        /** From the home screen widget: start a trip, or stop the one running. */
+        const val ACTION_TOGGLE = "nz.mileagelog.app.TOGGLE_TRIP"
         const val EXTRA_TRIP_ID = "tripId"
         const val EXTRA_STARTED_BY = "startedBy"
         const val CHANNEL_ID = "trip_recording"
@@ -112,6 +114,20 @@ class TripRecorderService : Service(), LocationListener {
                 notifyNow("Car disconnected, stopping in 2 minutes")
             } else stopSelf()
             ACTION_CAR_CONNECTED -> handler.removeCallbacks(stopAfterDisconnect)
+            ACTION_TOGGLE -> {
+                if (tripId != null || currentTripId(this) != null) {
+                    // Started with startForegroundService, so we must go
+                    // foreground briefly even when stopping.
+                    if (goForeground("Stopping…")) stopTrip() else stopSelf()
+                    if (tripId == null && currentTripId(this) != null) {
+                        // Service was restarted without the trip in memory.
+                        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").apply()
+                        HomeWidgets.updateTrip(this)
+                    }
+                } else {
+                    startTrip(UUID.randomUUID().toString(), "widget")
+                }
+            }
             null -> {
                 // Restarted by the system after being killed: resume the trip
                 // that was in progress, if any.
@@ -127,11 +143,22 @@ class TripRecorderService : Service(), LocationListener {
         if (tripId == id) return
         if (tripId != null) stopTrip(keepService = true)
 
-        val notification = buildNotification("Starting…")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        if (!goForeground("Starting…")) {
+            // No location permission (or Android refused): explain instead of crashing.
+            ensureChannel(this)
+            val open = PendingIntent.getActivity(
+                this, 3, Intent(this, MainActivity::class.java).putExtra("open", "trips").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            getSystemService(NotificationManager::class.java).notify(
+                43,
+                Notification.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_stat_trip)
+                    .setContentTitle("Couldn't start the trip")
+                    .setContentText("Open MileageLog and allow location to record trips")
+                    .setAutoCancel(true).setContentIntent(open).build()
+            )
+            stopSelf()
+            return
         }
 
         tripId = id
@@ -152,8 +179,23 @@ class TripRecorderService : Service(), LocationListener {
         distanceM = 0.0
         last = null
         stillSinceElapsed = 0L
+        prefs(this).edit().putFloat("liveKm", 0f).putLong("liveStartMs", startedAtMs).apply()
         setMode(Mode.SLOW)
         notifyNow(null)
+        HomeWidgets.updateTrip(this)
+    }
+
+    /** Returns false when Android won't let the service go foreground. */
+    private fun goForeground(text: String): Boolean = try {
+        val notification = buildNotification(text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+        true
+    } catch (e: Exception) {
+        false
     }
 
     private fun stopTrip(keepService: Boolean = false) {
@@ -168,7 +210,8 @@ class TripRecorderService : Service(), LocationListener {
             meta.writeText(j.put("endAt", System.currentTimeMillis()).toString())
         }
         tripId = null
-        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").apply()
+        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("liveKm").remove("liveStartMs").apply()
+        HomeWidgets.updateTrip(this)
         if (!keepService) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -222,6 +265,10 @@ class TripRecorderService : Service(), LocationListener {
 
     private fun notifyNow(text: String?) {
         lastNotifyElapsed = SystemClock.elapsedRealtime()
+        if (tripId != null) {
+            prefs(this).edit().putFloat("liveKm", (distanceM / 1000).toFloat()).apply()
+            HomeWidgets.updateTrip(this)
+        }
         val mins = ((System.currentTimeMillis() - startedAtMs) / 60_000).coerceAtLeast(0)
         val body = text ?: String.format("%.1f km · %d min", distanceM / 1000, mins)
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(body))
