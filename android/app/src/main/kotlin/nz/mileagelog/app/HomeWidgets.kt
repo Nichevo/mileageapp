@@ -27,17 +27,39 @@ object HomeWidgets {
 
     fun updateAll(ctx: Context) {
         val mgr = AppWidgetManager.getInstance(ctx)
-        for (cls in listOf(FillUpWidget::class.java, TripWidget::class.java, SummaryWidget::class.java)) {
+        for (cls in listOf(FillUpWidget::class.java, TripWidget::class.java, SummaryWidget::class.java, QuickWidget::class.java, DashboardWidget::class.java)) {
             val ids = mgr.getAppWidgetIds(ComponentName(ctx, cls))
             if (ids.isEmpty()) continue
             for (id in ids) mgr.updateAppWidget(id, render(ctx, cls))
         }
     }
 
+    /** Widgets that show the trip state. */
     fun updateTrip(ctx: Context) {
         val mgr = AppWidgetManager.getInstance(ctx)
-        val ids = mgr.getAppWidgetIds(ComponentName(ctx, TripWidget::class.java))
-        for (id in ids) mgr.updateAppWidget(id, render(ctx, TripWidget::class.java))
+        for (cls in listOf(TripWidget::class.java, QuickWidget::class.java, DashboardWidget::class.java)) {
+            for (id in mgr.getAppWidgetIds(ComponentName(ctx, cls))) mgr.updateAppWidget(id, render(ctx, cls))
+        }
+    }
+
+    private fun tripToggle(ctx: Context): PendingIntent = PendingIntent.getForegroundService(
+        ctx, 11,
+        Intent(ctx, TripRecorderService::class.java).setAction(TripRecorderService.ACTION_TOGGLE),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    /** Fill-up and trip buttons shared by the 2x2 and 4x2 widgets. */
+    private fun RemoteViews.quickButtons(ctx: Context) {
+        val prefs = TripRecorderService.prefs(ctx)
+        if (TripRecorderService.currentTripId(ctx) != null) {
+            setTextViewText(R.id.btn_trip_text, String.format("Stop · %.1f km", prefs.getFloat("liveKm", 0f)))
+            setImageViewResource(R.id.btn_trip_icon, R.drawable.ic_widget_stop)
+        } else {
+            setTextViewText(R.id.btn_trip_text, "Start trip")
+            setImageViewResource(R.id.btn_trip_icon, R.drawable.ic_widget_play)
+        }
+        setOnClickPendingIntent(R.id.btn_fill, openApp(ctx, "fillup", 13))
+        setOnClickPendingIntent(R.id.btn_trip, tripToggle(ctx))
     }
 
     private fun openApp(ctx: Context, what: String, code: Int): PendingIntent =
@@ -70,12 +92,18 @@ object HomeWidgets {
                     setTextViewText(R.id.widget_detail, s.optString("trip", "Tap to record"))
                     setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_play)
                 }
-                val toggle = PendingIntent.getForegroundService(
-                    ctx, 11,
-                    Intent(ctx, TripRecorderService::class.java).setAction(TripRecorderService.ACTION_TOGGLE),
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-                setOnClickPendingIntent(R.id.widget_root, toggle)
+                setOnClickPendingIntent(R.id.widget_root, tripToggle(ctx))
+            }
+            QuickWidget::class.java -> RemoteViews(ctx.packageName, R.layout.widget_quick).apply {
+                quickButtons(ctx)
+            }
+            DashboardWidget::class.java -> RemoteViews(ctx.packageName, R.layout.widget_dashboard).apply {
+                setTextViewText(R.id.widget_title, s.optString("yearTitle", "This year").uppercase())
+                setTextViewText(R.id.widget_detail, s.optString("year", "No fill-ups yet"))
+                setTextViewText(R.id.widget_economy, s.optString("fill", s.optString("economy", "")))
+                setTextViewText(R.id.widget_next, s.optString("next", "Nothing due soon"))
+                setOnClickPendingIntent(R.id.widget_summary, openApp(ctx, "home", 14))
+                quickButtons(ctx)
             }
             else -> RemoteViews(ctx.packageName, R.layout.widget_summary).apply {
                 setTextViewText(R.id.widget_title, s.optString("yearTitle", "This year"))
@@ -97,3 +125,5 @@ abstract class BaseWidget : AppWidgetProvider() {
 class FillUpWidget : BaseWidget()
 class TripWidget : BaseWidget()
 class SummaryWidget : BaseWidget()
+class QuickWidget : BaseWidget()
+class DashboardWidget : BaseWidget()

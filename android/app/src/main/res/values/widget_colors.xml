@@ -8,4 +8,7 @@
     <string name="widget_fillup_desc">Log a fill-up in one tap, with your last fill and range</string>
     <string name="widget_trip_desc">Start or stop recording a trip</string>
     <string name="widget_summary_desc">This year\'s distance and spend, and what\'s due next</string>
+    <color name="widget_button">#ffdcefe0</color>
+    <string name="widget_quick_desc">Log a fill-up or start a trip</string>
+    <string name="widget_dashboard_desc">This year, what\'s due next, and buttons for a fill-up or a trip</string>
 </resources>

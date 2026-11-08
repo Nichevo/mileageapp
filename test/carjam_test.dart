@@ -85,6 +85,11 @@ void main() {
     expect(l.ticks.length, 6);
     expect(l.label(10000), '10k');
     expect(l.pos(99), closeTo(2, 1e-9));
+
+    // Typical weeks around 300 km; one 1,800 km road trip.
+    expect(ChartScale.typicalCap([280, 310, 0, 295, 1800, 320, 305]), closeTo(307.5 * 2.5, 1e-9));
+    expect(ChartScale.typicalCap([280, 310, 295, 320]), isNull); // nothing stands out
+    expect(ChartScale.typicalCap([100, 5000]), isNull); // too few to judge
   });
 
   testWidgets('plate lookup fills the form and sets WOF and rego dates', (tester) async {

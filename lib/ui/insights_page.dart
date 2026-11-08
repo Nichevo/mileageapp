@@ -19,7 +19,7 @@ class InsightsPage extends StatefulWidget {
 class _InsightsPageState extends State<InsightsPage> {
   int _rangeMonths = 12; // 0 = all
   Period _period = Period.month;
-  bool _log = false;
+  bool _full = false; // show unusually big periods at full height
 
   @override
   Widget build(BuildContext context) {
@@ -85,9 +85,9 @@ class _InsightsPageState extends State<InsightsPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: FilterChip(
-                  label: const Text('Log scale'),
-                  selected: _log,
-                  onSelected: (v) => setState(() => _log = v),
+                  label: const Text('Show long trips in full'),
+                  selected: _full,
+                  onSelected: (v) => setState(() => _full = v),
                 ),
               ),
               const SizedBox(height: 12),
@@ -95,23 +95,24 @@ class _InsightsPageState extends State<InsightsPage> {
                 title: 'Distance per $unit · km',
                 caption: '${fmtKm(totalKm)} km in this range'
                     '${busiest == null || busiest.km == 0 ? '' : ', most in ${_fullLabel(busiest.start)} (${fmtKm(busiest.km)} km)'}. '
-                    'Distance between two fill-ups is spread evenly over the days between them.',
-                child: _bars(series((t) => t.km), cs.primary, log: _log),
+                    'Distance between two fill-ups is spread evenly over the days between them.'
+                    '${_full ? '' : ' Bars with a break at the top are off the scale; tap one for its value.'}',
+                child: _bars(series((t) => t.km), cs.primary, fit: !_full),
               ),
               _ChartCard(
                 title: 'Fuel spend per $unit · \$',
                 caption: '${fmtMoney0(totalCost)} in this range',
-                child: _bars(series((t) => t.cost), cs.tertiary, log: _log),
+                child: _bars(series((t) => t.cost), cs.tertiary, fit: !_full),
               ),
               _ChartCard(
                 title: 'Cost per 100 km · \$ per $unit',
                 caption: totalKm > 0 ? 'Average \$${(totalCost / totalKm * 100).toStringAsFixed(2)} per 100 km over the range' : '',
-                child: _bars(series((t) => t.costPer100), cs.tertiary, log: _log),
+                child: _bars(series((t) => t.costPer100), cs.tertiary, fit: !_full),
               ),
               _ChartCard(
                 title: 'Price per litre · \$ per $unit',
                 caption: 'Average of the fill-ups made in each $unit. Empty bars had no fill-up.',
-                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, log: _log),
+                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, fit: !_full),
               ),
               _ChartCard(
                 title: 'Fuel economy · L/100 km, rolling 5 fills',
@@ -153,11 +154,16 @@ class _InsightsPageState extends State<InsightsPage> {
 
   /// Bar chart with a fixed value scale on the left and every bar labelled.
   /// When the bars don't fit, the chart scrolls sideways (newest showing).
-  /// [log] plots log10(value + 1) so a few very high bars don't flatten the rest.
-  Widget _bars(List<_Bar> data, Color color, {int? decimals, bool log = false}) {
+  /// With [fit], the scale is set by typical periods: a bar far above them
+  /// (a long road trip) is cut off at the top with a break mark, and its
+  /// real value shows when tapped.
+  Widget _bars(List<_Bar> data, Color color, {int? decimals, bool fit = false}) {
     if (data.isEmpty) return const SizedBox();
-    final maxV = data.map((d) => d.value).fold(0.0, math.max);
-    final scale = ChartScale.of(maxV, log: log);
+    final values = [for (final d in data) d.value];
+    final cap = fit ? ChartScale.typicalCap(values) : null;
+    final double maxV = cap ?? values.fold<double>(0, math.max);
+    final scale = ChartScale.of(maxV);
+    final surface = Theme.of(context).colorScheme.surfaceContainerLow;
     final rotate = data.any((d) => d.label.length > 3);
     final bottomH = rotate ? 46.0 : 20.0;
     const axisW = 44.0;
@@ -227,7 +233,21 @@ class _InsightsPageState extends State<InsightsPage> {
           barGroups: [
             for (var i = 0; i < data.length; i++)
               BarChartGroupData(x: i, barRods: [
-                BarChartRodData(toY: scale.pos(data[i].value), color: color, width: barW, borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1)),
+                if (data[i].value > scale.top)
+                  // Off the scale: full height with a break near the top.
+                  BarChartRodData(
+                    toY: scale.top,
+                    color: color,
+                    width: barW,
+                    borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1),
+                    rodStackItems: [
+                      BarChartRodStackItem(0, scale.top * 0.86, color),
+                      BarChartRodStackItem(scale.top * 0.86, scale.top * 0.9, surface),
+                      BarChartRodStackItem(scale.top * 0.9, scale.top, color),
+                    ],
+                  )
+                else
+                  BarChartRodData(toY: scale.pos(data[i].value), color: color, width: barW, borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1)),
               ]),
           ],
         ),
@@ -384,6 +404,17 @@ class ChartScale {
     final f = rough / mag;
     final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
     return nice * mag;
+  }
+
+  /// A scale top that fits typical values: 2.5 times the median of the
+  /// non-zero values. Null when nothing stands out (or too few values).
+  static double? typicalCap(List<double> values) {
+    final v = values.where((x) => x > 0).toList()..sort();
+    if (v.length < 4) return null;
+    final mid = v.length ~/ 2;
+    final median = v.length.isOdd ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+    final cap = median * 2.5;
+    return v.last > cap * 1.15 ? cap : null;
   }
 
   factory ChartScale.of(double maxV, {bool log = false}) {
