@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../app.dart';
 import '../data/database.dart';
@@ -9,6 +12,7 @@ import '../domain/stats.dart';
 import 'care_page.dart';
 import 'fillup_form.dart';
 import 'format.dart';
+import 'insights_page.dart' show ChartScale;
 import 'prices_page.dart' show FuelPriceCard;
 import 'import_page.dart';
 
@@ -75,7 +79,10 @@ class _Dashboard extends StatelessWidget {
               color: cs.tertiaryContainer,
               child: ListTile(
                 leading: Icon(Icons.trending_up, color: cs.onTertiaryContainer),
-                title: Text('Last tank used ${(latestEconomyChange(stats)! * 100).round()}% more fuel than usual', style: TextStyle(color: cs.onTertiaryContainer)),
+                title: Text(
+                  'Last tank used ${(latestEconomyChange(stats)! * 100).round()}% more fuel than usual',
+                  style: TextStyle(color: cs.onTertiaryContainer),
+                ),
                 subtitle: Text(
                   'Lots of short trips, a heavy load or a roof rack can do it. Low tyre pressure or a dragging brake can too, so a tyre check is worth a minute.',
                   style: TextStyle(color: cs.onTertiaryContainer),
@@ -103,17 +110,37 @@ class _Dashboard extends StatelessWidget {
               ),
             )
           else ...[
-            Row(children: [
-              Expanded(child: _Tile(label: 'Last tank', value: fmtPer100(lastTank?.litresPer100), unit: 'L/100 km')),
-              const SizedBox(width: 8),
-              Expanded(child: _Tile(label: 'Lifetime', value: fmtPer100(lifetime.per100), unit: 'L/100 km')),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _Tile(label: 'Last tank', value: fmtPer100(lastTank?.litresPer100), unit: 'L/100 km'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _Tile(label: 'Lifetime', value: fmtPer100(lifetime.per100), unit: 'L/100 km'),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: _Tile(label: 'Last price', value: lastTank == null ? '—' : '\$${lastTank.pricePerUnit.toStringAsFixed(2)}', unit: '/L')),
-              const SizedBox(width: 8),
-              Expanded(child: _Tile(label: 'Cost / 100 km', value: lastTank?.costPer100 == null ? '—' : '\$${lastTank!.costPer100!.toStringAsFixed(1)}', unit: '')),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _Tile(
+                    label: 'Last price',
+                    value: lastTank == null ? '—' : '\$${lastTank.pricePerUnit.toStringAsFixed(2)}',
+                    unit: '/L',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _Tile(
+                    label: 'Cost / 100 km',
+                    value: lastTank?.costPer100 == null ? '—' : '\$${lastTank!.costPer100!.toStringAsFixed(1)}',
+                    unit: '',
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             _RangeTile(vehicle: vehicle, latest: latest, recentPer100: recent),
             const SizedBox(height: 8),
@@ -124,31 +151,39 @@ class _Dashboard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('L/100 KM · LAST 10 FILLS', style: Theme.of(context).textTheme.labelSmall),
-                    SizedBox(height: 120, child: _EconomyChart(stats: stats.length > 10 ? stats.sublist(stats.length - 10) : stats, color: cs.primary)),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 150,
+                      child: _EconomyChart(stats: stats.length > 10 ? stats.sublist(stats.length - 10) : stats, color: cs.primary),
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: _Tile(
-                  label: 'This year',
-                  value: thisYear == null ? '0' : fmtKm(thisYear.km),
-                  unit: 'km',
-                  sub: thisYear == null ? null : '${fmtMoney0(thisYear.cost)} · ${fmtKm(thisYear.quantity)} L · ${fmtPer100(thisYear.per100)} L/100',
+            Row(
+              children: [
+                Expanded(
+                  child: _Tile(
+                    label: 'This year',
+                    value: thisYear == null ? '0' : fmtKm(thisYear.km),
+                    unit: 'km',
+                    sub: thisYear == null
+                        ? null
+                        : '${fmtMoney0(thisYear.cost)} · ${fmtKm(thisYear.quantity)} L · ${fmtPer100(thisYear.per100)} L/100',
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _Tile(
-                  label: 'Lifetime',
-                  value: fmtKm(lifetime.km),
-                  unit: 'km',
-                  sub: '${lifetime.fills} fills · ${fmtMoney0(lifetime.cost)}',
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _Tile(
+                    label: 'Lifetime',
+                    value: fmtKm(lifetime.km),
+                    unit: 'km',
+                    sub: '${lifetime.fills} fills · ${fmtMoney0(lifetime.cost)}',
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           ],
         ],
       ),
@@ -227,29 +262,71 @@ class _EconomyChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spots = <FlSpot>[];
-    for (var i = 0; i < stats.length; i++) {
-      final v = stats[i].litresPer100;
-      if (v != null) spots.add(FlSpot(i.toDouble(), v));
-    }
-    if (spots.length < 2) {
+    // Only tanks with a figure, evenly spaced, dated underneath.
+    final points = [
+      for (final s in stats)
+        if (s.litresPer100 != null) s,
+    ];
+    if (points.length < 2) {
       return const Center(child: Text('Need two full fills for a trend'));
     }
+    final spots = [for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), points[i].litresPer100!)];
     final ys = spots.map((s) => s.y);
-    final minY = (ys.reduce((a, b) => a < b ? a : b) - 1).floorToDouble();
-    final maxY = (ys.reduce((a, b) => a > b ? a : b) + 1).ceilToDouble();
+    final lo = ys.reduce(math.min), hi = ys.reduce(math.max);
+    final step = ChartScale.niceStep(math.max(hi - lo, 1) / 3);
+    var minY = (lo / step).floor() * step, maxY = (hi / step).ceil() * step;
+    if (maxY - minY < step * 2) maxY = minY + step * 2;
+    const style = TextStyle(fontSize: 10);
+    final side = SideTitles(
+      showTitles: true,
+      reservedSize: 30,
+      interval: step,
+      getTitlesWidget: (v, meta) => Text(v.toStringAsFixed(step < 1 ? 1 : 0), style: style),
+    );
+    final every = points.length <= 6 ? 1 : 2;
     return LineChart(
       LineChartData(
         minY: minY,
         maxY: maxY,
-        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
+        minX: 0,
+        maxX: spots.length - 1.0,
+        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: step),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(),
-          rightTitles: const AxisTitles(),
-          bottomTitles: const AxisTitles(),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, interval: 1)),
+          leftTitles: AxisTitles(sideTitles: side),
+          rightTitles: AxisTitles(sideTitles: side),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 20,
+              interval: 1,
+              getTitlesWidget: (v, meta) {
+                final i = v.round();
+                if ((v - i).abs() > 1e-6 || i < 0 || i >= points.length) return const SizedBox();
+                // Always label the latest fill; thin the rest when crowded.
+                if ((points.length - 1 - i) % every != 0) return const SizedBox();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(DateFormat('d-MMM').format(points[i].fill.at), style: style),
+                );
+              },
+            ),
+          ),
         ),
         borderData: FlBorderData(show: false),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItems: (touched) => [
+              for (final t in touched)
+                LineTooltipItem(
+                  '${DateFormat('d MMM yyyy').format(points[t.x.round()].fill.at)}\n${t.y.toStringAsFixed(1)} L/100 km',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+            ],
+          ),
+        ),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
