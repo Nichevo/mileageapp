@@ -117,6 +117,53 @@ class Repository {
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
 
+  // ---- trips -------------------------------------------------------------
+
+  Stream<List<Trip>> watchTrips(String vehicleId) =>
+      (db.select(db.trips)
+            ..where((t) => t.vehicleId.equals(vehicleId))
+            ..orderBy([(t) => OrderingTerm.desc(t.startAt)]))
+          .watch();
+
+  Future<Trip?> trip(String id) => (db.select(db.trips)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Stream<Trip?> watchTrip(String id) =>
+      (db.select(db.trips)..where((t) => t.id.equals(id))).watchSingleOrNull();
+
+  Future<List<TripPoint>> tripPoints(String tripId) => (db.select(db.tripPoints)
+        ..where((p) => p.tripId.equals(tripId))
+        ..orderBy([(p) => OrderingTerm.asc(p.at)]))
+      .get();
+
+  Future<List<TripStop>> tripStops(String tripId) => (db.select(db.tripStops)
+        ..where((s) => s.tripId.equals(tripId))
+        ..orderBy([(s) => OrderingTerm.asc(s.arriveAt)]))
+      .get();
+
+  Future<void> upsertTrip(TripsCompanion t) => db.into(db.trips).insertOnConflictUpdate(t);
+
+  Future<void> renameTrip(String id, String name, {String? notes}) =>
+      (db.update(db.trips)..where((t) => t.id.equals(id))).write(TripsCompanion(name: Value(name), notes: Value(notes)));
+
+  Future<void> deleteTrip(String id) => db.transaction(() async {
+        await (db.delete(db.tripPoints)..where((p) => p.tripId.equals(id))).go();
+        await (db.delete(db.tripStops)..where((s) => s.tripId.equals(id))).go();
+        await (db.delete(db.trips)..where((t) => t.id.equals(id))).go();
+      });
+
+  /// Replaces a trip's points and stops in one go (used when a recording ends).
+  Future<void> saveRecordedTrip(TripsCompanion trip, List<TripPointsCompanion> points, List<TripStopsCompanion> stops) =>
+      db.transaction(() async {
+        final id = trip.id.value;
+        await db.into(db.trips).insertOnConflictUpdate(trip);
+        await (db.delete(db.tripPoints)..where((p) => p.tripId.equals(id))).go();
+        await (db.delete(db.tripStops)..where((s) => s.tripId.equals(id))).go();
+        await db.batch((b) {
+          b.insertAll(db.tripPoints, points);
+          b.insertAll(db.tripStops, stops);
+        });
+      });
+
   // ---- sync queue --------------------------------------------------------
 
   Future<void> _enqueue(String table, String rowId, {String action = 'upsert'}) =>

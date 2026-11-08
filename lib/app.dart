@@ -6,6 +6,8 @@ import 'ui/history_page.dart';
 import 'ui/home_page.dart';
 import 'ui/insights_page.dart';
 import 'ui/more_page.dart';
+import 'ui/trips_page.dart';
+import 'trips/recorder.dart';
 
 /// Gives every page access to the repository and settings.
 class AppScope extends InheritedWidget {
@@ -53,12 +55,46 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onOpen());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onOpen();
+  }
+
+  /// Saves any trips that finished while the app was closed, and handles the
+  /// "Connected to your car, tap to start" notification.
+  Future<void> _onOpen() async {
+    if (!TripRecorder.supported || !mounted) return;
+    final scope = AppScope.of(context);
+    try {
+      await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
+      if (await TripRecorder.consumeStartRequest()) {
+        if (mounted) setState(() => _index = 2);
+        if (await TripRecorder.currentTripId() == null) await TripRecorder.startManual();
+      }
+    } catch (_) {
+      // Never block the app opening on trip housekeeping.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final pages = const [HomePage(), HistoryPage(), InsightsPage(), MorePage()];
+    final pages = const [HomePage(), HistoryPage(), TripsPage(), InsightsPage(), MorePage()];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: NavigationBar(
@@ -67,6 +103,7 @@ class _ShellState extends State<Shell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.speed_outlined), selectedIcon: Icon(Icons.speed), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: 'Trips'),
           NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Insights'),
           NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
         ],

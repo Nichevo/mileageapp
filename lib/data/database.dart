@@ -114,6 +114,10 @@ class Trips extends Table {
   TextColumn get notes => text().nullable()();
   TextColumn get source => text().withDefault(const Constant('app'))();
   TextColumn get sourceRef => text().nullable()();
+  /// v2: 'manual' or 'bluetooth', how the recording started.
+  TextColumn get startedBy => text().nullable()();
+  /// v2: summary from computeTripStats, so the list needn't load every point.
+  TextColumn get statsJson => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -215,14 +219,20 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async => m.createAll(),
+        onCreate: (m) async {
+          await m.createAll();
+          await m.createIndex(Index('trip_points_trip', 'CREATE INDEX IF NOT EXISTS trip_points_trip ON trip_points (trip_id, at)'));
+        },
         onUpgrade: (m, from, to) async {
-          // Example for a future change:
-          // if (from < 2) await m.addColumn(vehicles, vehicles.colour);
+          if (from < 2) {
+            await m.addColumn(trips, trips.startedBy);
+            await m.addColumn(trips, trips.statsJson);
+            await m.createIndex(Index('trip_points_trip', 'CREATE INDEX IF NOT EXISTS trip_points_trip ON trip_points (trip_id, at)'));
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');

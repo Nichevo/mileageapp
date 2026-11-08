@@ -3212,6 +3212,28 @@ class $TripsTable extends Trips with TableInfo<$TripsTable, Trip> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _startedByMeta = const VerificationMeta(
+    'startedBy',
+  );
+  @override
+  late final GeneratedColumn<String> startedBy = GeneratedColumn<String>(
+    'started_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statsJsonMeta = const VerificationMeta(
+    'statsJson',
+  );
+  @override
+  late final GeneratedColumn<String> statsJson = GeneratedColumn<String>(
+    'stats_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3226,6 +3248,8 @@ class $TripsTable extends Trips with TableInfo<$TripsTable, Trip> {
     notes,
     source,
     sourceRef,
+    startedBy,
+    statsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3325,6 +3349,18 @@ class $TripsTable extends Trips with TableInfo<$TripsTable, Trip> {
         sourceRef.isAcceptableOrUnknown(data['source_ref']!, _sourceRefMeta),
       );
     }
+    if (data.containsKey('started_by')) {
+      context.handle(
+        _startedByMeta,
+        startedBy.isAcceptableOrUnknown(data['started_by']!, _startedByMeta),
+      );
+    }
+    if (data.containsKey('stats_json')) {
+      context.handle(
+        _statsJsonMeta,
+        statsJson.isAcceptableOrUnknown(data['stats_json']!, _statsJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -3382,6 +3418,14 @@ class $TripsTable extends Trips with TableInfo<$TripsTable, Trip> {
         DriftSqlType.string,
         data['${effectivePrefix}source_ref'],
       ),
+      startedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}started_by'],
+      ),
+      statsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stats_json'],
+      ),
     );
   }
 
@@ -3406,6 +3450,12 @@ class Trip extends DataClass implements Insertable<Trip> {
   final String? notes;
   final String source;
   final String? sourceRef;
+
+  /// v2: 'manual' or 'bluetooth', how the recording started.
+  final String? startedBy;
+
+  /// v2: summary from computeTripStats, so the list needn't load every point.
+  final String? statsJson;
   const Trip({
     required this.id,
     required this.vehicleId,
@@ -3419,6 +3469,8 @@ class Trip extends DataClass implements Insertable<Trip> {
     this.notes,
     required this.source,
     this.sourceRef,
+    this.startedBy,
+    this.statsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3446,6 +3498,12 @@ class Trip extends DataClass implements Insertable<Trip> {
     map['source'] = Variable<String>(source);
     if (!nullToAbsent || sourceRef != null) {
       map['source_ref'] = Variable<String>(sourceRef);
+    }
+    if (!nullToAbsent || startedBy != null) {
+      map['started_by'] = Variable<String>(startedBy);
+    }
+    if (!nullToAbsent || statsJson != null) {
+      map['stats_json'] = Variable<String>(statsJson);
     }
     return map;
   }
@@ -3476,6 +3534,12 @@ class Trip extends DataClass implements Insertable<Trip> {
       sourceRef: sourceRef == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceRef),
+      startedBy: startedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedBy),
+      statsJson: statsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(statsJson),
     );
   }
 
@@ -3497,6 +3561,8 @@ class Trip extends DataClass implements Insertable<Trip> {
       notes: serializer.fromJson<String?>(json['notes']),
       source: serializer.fromJson<String>(json['source']),
       sourceRef: serializer.fromJson<String?>(json['sourceRef']),
+      startedBy: serializer.fromJson<String?>(json['startedBy']),
+      statsJson: serializer.fromJson<String?>(json['statsJson']),
     );
   }
   @override
@@ -3515,6 +3581,8 @@ class Trip extends DataClass implements Insertable<Trip> {
       'notes': serializer.toJson<String?>(notes),
       'source': serializer.toJson<String>(source),
       'sourceRef': serializer.toJson<String?>(sourceRef),
+      'startedBy': serializer.toJson<String?>(startedBy),
+      'statsJson': serializer.toJson<String?>(statsJson),
     };
   }
 
@@ -3531,6 +3599,8 @@ class Trip extends DataClass implements Insertable<Trip> {
     Value<String?> notes = const Value.absent(),
     String? source,
     Value<String?> sourceRef = const Value.absent(),
+    Value<String?> startedBy = const Value.absent(),
+    Value<String?> statsJson = const Value.absent(),
   }) => Trip(
     id: id ?? this.id,
     vehicleId: vehicleId ?? this.vehicleId,
@@ -3550,6 +3620,8 @@ class Trip extends DataClass implements Insertable<Trip> {
     notes: notes.present ? notes.value : this.notes,
     source: source ?? this.source,
     sourceRef: sourceRef.present ? sourceRef.value : this.sourceRef,
+    startedBy: startedBy.present ? startedBy.value : this.startedBy,
+    statsJson: statsJson.present ? statsJson.value : this.statsJson,
   );
   Trip copyWithCompanion(TripsCompanion data) {
     return Trip(
@@ -3571,6 +3643,8 @@ class Trip extends DataClass implements Insertable<Trip> {
       notes: data.notes.present ? data.notes.value : this.notes,
       source: data.source.present ? data.source.value : this.source,
       sourceRef: data.sourceRef.present ? data.sourceRef.value : this.sourceRef,
+      startedBy: data.startedBy.present ? data.startedBy.value : this.startedBy,
+      statsJson: data.statsJson.present ? data.statsJson.value : this.statsJson,
     );
   }
 
@@ -3588,7 +3662,9 @@ class Trip extends DataClass implements Insertable<Trip> {
           ..write('status: $status, ')
           ..write('notes: $notes, ')
           ..write('source: $source, ')
-          ..write('sourceRef: $sourceRef')
+          ..write('sourceRef: $sourceRef, ')
+          ..write('startedBy: $startedBy, ')
+          ..write('statsJson: $statsJson')
           ..write(')'))
         .toString();
   }
@@ -3607,6 +3683,8 @@ class Trip extends DataClass implements Insertable<Trip> {
     notes,
     source,
     sourceRef,
+    startedBy,
+    statsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -3623,7 +3701,9 @@ class Trip extends DataClass implements Insertable<Trip> {
           other.status == this.status &&
           other.notes == this.notes &&
           other.source == this.source &&
-          other.sourceRef == this.sourceRef);
+          other.sourceRef == this.sourceRef &&
+          other.startedBy == this.startedBy &&
+          other.statsJson == this.statsJson);
 }
 
 class TripsCompanion extends UpdateCompanion<Trip> {
@@ -3639,6 +3719,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
   final Value<String?> notes;
   final Value<String> source;
   final Value<String?> sourceRef;
+  final Value<String?> startedBy;
+  final Value<String?> statsJson;
   final Value<int> rowid;
   const TripsCompanion({
     this.id = const Value.absent(),
@@ -3653,6 +3735,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
     this.notes = const Value.absent(),
     this.source = const Value.absent(),
     this.sourceRef = const Value.absent(),
+    this.startedBy = const Value.absent(),
+    this.statsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TripsCompanion.insert({
@@ -3668,6 +3752,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
     this.notes = const Value.absent(),
     this.source = const Value.absent(),
     this.sourceRef = const Value.absent(),
+    this.startedBy = const Value.absent(),
+    this.statsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        vehicleId = Value(vehicleId),
@@ -3686,6 +3772,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
     Expression<String>? notes,
     Expression<String>? source,
     Expression<String>? sourceRef,
+    Expression<String>? startedBy,
+    Expression<String>? statsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3701,6 +3789,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
       if (notes != null) 'notes': notes,
       if (source != null) 'source': source,
       if (sourceRef != null) 'source_ref': sourceRef,
+      if (startedBy != null) 'started_by': startedBy,
+      if (statsJson != null) 'stats_json': statsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3718,6 +3808,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
     Value<String?>? notes,
     Value<String>? source,
     Value<String?>? sourceRef,
+    Value<String?>? startedBy,
+    Value<String?>? statsJson,
     Value<int>? rowid,
   }) {
     return TripsCompanion(
@@ -3733,6 +3825,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
       notes: notes ?? this.notes,
       source: source ?? this.source,
       sourceRef: sourceRef ?? this.sourceRef,
+      startedBy: startedBy ?? this.startedBy,
+      statsJson: statsJson ?? this.statsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3776,6 +3870,12 @@ class TripsCompanion extends UpdateCompanion<Trip> {
     if (sourceRef.present) {
       map['source_ref'] = Variable<String>(sourceRef.value);
     }
+    if (startedBy.present) {
+      map['started_by'] = Variable<String>(startedBy.value);
+    }
+    if (statsJson.present) {
+      map['stats_json'] = Variable<String>(statsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3797,6 +3897,8 @@ class TripsCompanion extends UpdateCompanion<Trip> {
           ..write('notes: $notes, ')
           ..write('source: $source, ')
           ..write('sourceRef: $sourceRef, ')
+          ..write('startedBy: $startedBy, ')
+          ..write('statsJson: $statsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9298,6 +9400,8 @@ typedef $$TripsTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<String> source,
       Value<String?> sourceRef,
+      Value<String?> startedBy,
+      Value<String?> statsJson,
       Value<int> rowid,
     });
 typedef $$TripsTableUpdateCompanionBuilder =
@@ -9314,6 +9418,8 @@ typedef $$TripsTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<String> source,
       Value<String?> sourceRef,
+      Value<String?> startedBy,
+      Value<String?> statsJson,
       Value<int> rowid,
     });
 
@@ -9435,6 +9541,16 @@ class $$TripsTableFilterComposer extends Composer<_$AppDatabase, $TripsTable> {
 
   ColumnFilters<String> get sourceRef => $composableBuilder(
     column: $table.sourceRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startedBy => $composableBuilder(
+    column: $table.startedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get statsJson => $composableBuilder(
+    column: $table.statsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9576,6 +9692,16 @@ class $$TripsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get startedBy => $composableBuilder(
+    column: $table.startedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get statsJson => $composableBuilder(
+    column: $table.statsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$VehiclesTableOrderingComposer get vehicleId {
     final $$VehiclesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9647,6 +9773,12 @@ class $$TripsTableAnnotationComposer
 
   GeneratedColumn<String> get sourceRef =>
       $composableBuilder(column: $table.sourceRef, builder: (column) => column);
+
+  GeneratedColumn<String> get startedBy =>
+      $composableBuilder(column: $table.startedBy, builder: (column) => column);
+
+  GeneratedColumn<String> get statsJson =>
+      $composableBuilder(column: $table.statsJson, builder: (column) => column);
 
   $$VehiclesTableAnnotationComposer get vehicleId {
     final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
@@ -9766,6 +9898,8 @@ class $$TripsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String?> sourceRef = const Value.absent(),
+                Value<String?> startedBy = const Value.absent(),
+                Value<String?> statsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TripsCompanion(
                 id: id,
@@ -9780,6 +9914,8 @@ class $$TripsTableTableManager
                 notes: notes,
                 source: source,
                 sourceRef: sourceRef,
+                startedBy: startedBy,
+                statsJson: statsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9796,6 +9932,8 @@ class $$TripsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String?> sourceRef = const Value.absent(),
+                Value<String?> startedBy = const Value.absent(),
+                Value<String?> statsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TripsCompanion.insert(
                 id: id,
@@ -9810,6 +9948,8 @@ class $$TripsTableTableManager
                 notes: notes,
                 source: source,
                 sourceRef: sourceRef,
+                startedBy: startedBy,
+                statsJson: statsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

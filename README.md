@@ -4,7 +4,7 @@ A personal mileage app: log petrol fill-ups (and, later, EV charges), see fuel e
 
 Android first, built with Flutter so an iPhone build and a read-only web view can follow from the same code.
 
-Status: **phase 1** (fill-ups, history, insights, import, backup, Sheets sync). See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+Status: **phase 2** (phase 1 fill-ups, history, insights, import, backup and Sheets sync, plus GPS trip recording with Bluetooth auto-start). See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
 
 ## Building and updating the Android app
 
@@ -28,6 +28,12 @@ dart run build_runner build --delete-conflicting-outputs   # drift code generati
 flutter test
 flutter run
 ```
+
+## Trip recording
+
+Trips are recorded by a native Android foreground service (`TripRecorderService`) so they continue with the screen off or the app closed. GPS sampling adapts to speed to save battery: every 2 s below about 20 km/h (to catch short stops), every 5 s or 25 m when moving faster, and every 15 s after three minutes parked. Fixes are appended to a file in the app's private storage and imported into the database when the trip ends; stats (moving average, short stops, speed bands, harsh braking, climb) are computed in `lib/domain/trip_stats.dart`.
+
+Bluetooth auto-start uses a manifest receiver for the car's connect and disconnect broadcasts. A trip starts when the chosen car connects and stops two minutes after it disconnects. Routes stay on the phone (and in the JSON backup); only map tiles are fetched from OpenStreetMap.
 
 ## Privacy rules for this repository
 
@@ -55,9 +61,11 @@ lib/data/        drift database, repository
 lib/domain/      fuel-economy maths
 lib/import/      Road Trip and Google Sheet CSV parsers
 lib/sync/        Google Sheets sync
+lib/trips/       bridge to the native trip recorder, import of finished trips
 lib/backup/      JSON backup and restore
 lib/ui/          screens
-android/         Android project (stable app ID, signing from key.properties or env)
+android/         Android project (stable app ID, signing from key.properties or env,
+                 TripRecorderService foreground GPS service, CarBluetoothReceiver)
 docs/            plan, mock-ups, icon
 sample_data/     fictional sheet and Road Trip exports in the real import formats
 scripts/         privacy check and helpers
