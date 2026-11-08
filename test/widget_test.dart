@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mileagelog/app.dart';
 import 'package:mileagelog/data/database.dart';
@@ -19,6 +20,10 @@ void main() {
     await tester.pump();
     expect(find.text('Log a fill-up'), findsOneWidget);
     expect(find.text('No fill-ups yet'), findsOneWidget);
-    await db.close();
+    // Unmount so drift closes its query streams, then close the database
+    // outside the fake clock (closing waits on real timers).
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+    await tester.runAsync(() => db.close());
   });
 }
