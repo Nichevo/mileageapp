@@ -158,3 +158,82 @@ double? rangeLeftKm({
   final left = fullRange - kmSinceFill;
   return left < 0 ? 0 : left;
 }
+
+/// Chart granularity on the Insights page.
+enum Period { week, month, year }
+
+/// Distance, fuel and cost that fall in one week, month or year.
+class PeriodTotals {
+  final DateTime start;
+  double km = 0, quantity = 0, cost = 0;
+  // Price is taken from the fills made in the period, not spread.
+  double filledQuantity = 0, filledCost = 0;
+  PeriodTotals(this.start);
+  double? get per100 => km > 0.5 ? quantity / km * 100 : null;
+  double? get costPer100 => km > 0.5 ? cost / km * 100 : null;
+  double? get pricePerUnit => filledQuantity > 0 ? filledCost / filledQuantity : null;
+}
+
+DateTime periodStart(DateTime d, Period p) => switch (p) {
+      Period.week => DateTime(d.year, d.month, d.day - (d.weekday - 1)), // Monday
+      Period.month => DateTime(d.year, d.month),
+      Period.year => DateTime(d.year),
+    };
+
+DateTime nextPeriod(DateTime start, Period p) => switch (p) {
+      Period.week => DateTime(start.year, start.month, start.day + 7),
+      Period.month => DateTime(start.year, start.month + 1),
+      Period.year => DateTime(start.year + 1),
+    };
+
+/// Totals per week, month or year. A tank's distance, fuel and cost are
+/// spread evenly over the days between the two fills, so a month without a
+/// fill-up still shows the driving done in it. Every period from the first
+/// to the last fill is present, including empty ones. With [from], periods
+/// before it are dropped (the spreading still uses the earlier fill).
+List<PeriodTotals> periodTotals(List<FuelRow> rows, Period p, {DateTime? from}) {
+  if (rows.length < 2) return const [];
+  final sorted = [...rows]..sort((a, b) => a.odometerKm.compareTo(b.odometerKm));
+  final buckets = <DateTime, PeriodTotals>{};
+  PeriodTotals bucket(DateTime day) {
+    final s = periodStart(day, p);
+    return buckets.putIfAbsent(s, () => PeriodTotals(s));
+  }
+
+  for (var i = 1; i < sorted.length; i++) {
+    final a = sorted[i - 1], b = sorted[i];
+    final km = b.odometerKm - a.odometerKm;
+    if (km < 0) continue;
+    final startDay = DateTime(a.at.year, a.at.month, a.at.day);
+    final endDay = DateTime(b.at.year, b.at.month, b.at.day);
+    final days = endDay.difference(startDay).inDays;
+    if (days <= 0) {
+      final t = bucket(endDay);
+      t.km += km;
+      t.quantity += b.quantity;
+      t.cost += b.cost;
+    } else {
+      for (var d = 0; d < days; d++) {
+        final t = bucket(DateTime(startDay.year, startDay.month, startDay.day + d));
+        t.km += km / days;
+        t.quantity += b.quantity / days;
+        t.cost += b.cost / days;
+      }
+    }
+    final f = bucket(b.at);
+    f.filledQuantity += b.quantity;
+    f.filledCost += b.cost;
+  }
+
+  // Fill in empty periods so gaps show as gaps.
+  var cur = periodStart(sorted.first.at, p);
+  final last = periodStart(sorted.last.at, p);
+  final out = <PeriodTotals>[];
+  while (!cur.isAfter(last)) {
+    out.add(buckets[cur] ?? PeriodTotals(cur));
+    cur = nextPeriod(cur, p);
+  }
+  if (from == null) return out;
+  final cut = periodStart(from, p);
+  return out.where((t) => !t.start.isBefore(cut)).toList();
+}

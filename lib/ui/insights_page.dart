@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../app.dart';
 import '../data/database.dart';
@@ -14,7 +15,8 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-  int _rangeYears = 0; // 0 = all
+  int _rangeMonths = 12; // 0 = all
+  Period _period = Period.month;
 
   @override
   Widget build(BuildContext context) {
@@ -25,48 +27,80 @@ class _InsightsPageState extends State<InsightsPage> {
       body: StreamBuilder<List<EnergyEvent>>(
         stream: scope.repo.watchEvents(vid),
         builder: (context, snap) {
-          var events = snap.data ?? const <EnergyEvent>[];
-          if (_rangeYears > 0) {
-            final cutoff = DateTime.now().subtract(Duration(days: 365 * _rangeYears));
-            events = events.where((e) => e.at.isAfter(cutoff)).toList();
-          }
-          final rows = Repository.toFuelRows(events);
+          final all = snap.data ?? const <EnergyEvent>[];
+          final now = DateTime.now();
+          final cutoff = _rangeMonths == 0 ? null : DateTime(now.year, now.month - _rangeMonths + 1, 1);
+          final allRows = Repository.toFuelRows(all);
+          final rows = cutoff == null ? allRows : allRows.where((r) => !r.at.isBefore(cutoff)).toList();
           final stats = tankStats(rows);
-          final yearly = yearlyTotals(rows);
-          final years = yearly.keys.toList()..sort();
           final cs = Theme.of(context).colorScheme;
-          if (events.length < 2) {
+          if (all.length < 2) {
             return const Center(child: Text('Charts appear after a couple of fill-ups'));
           }
+          // Spreading uses every fill, so the first period in range is complete.
+          final periods = periodTotals(allRows, _period, from: cutoff);
+          final totalKm = periods.fold<double>(0, (a, t) => a + t.km);
+          final totalCost = periods.fold<double>(0, (a, t) => a + t.cost);
           final byMonth = _kmPerDayByMonth(rows);
           final byDow = _fillsByWeekday(rows);
+          final unit = switch (_period) { Period.week => 'week', Period.month => 'month', Period.year => 'year' };
+          List<_Bar> series(double? Function(PeriodTotals) f) => [
+                for (var i = 0; i < periods.length; i++)
+                  _Bar(_axisLabel(periods, i), _fullLabel(periods[i].start), f(periods[i]) ?? 0),
+              ];
+          final busiest = periods.isEmpty ? null : periods.reduce((a, b) => a.km >= b.km ? a : b);
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             children: [
               SegmentedButton<int>(
+                showSelectedIcon: false,
                 segments: const [
-                  ButtonSegment(value: 1, label: Text('1 yr')),
-                  ButtonSegment(value: 3, label: Text('3 yr')),
+                  ButtonSegment(value: 6, label: Text('6 mo')),
+                  ButtonSegment(value: 12, label: Text('1 yr')),
+                  ButtonSegment(value: 36, label: Text('3 yr')),
                   ButtonSegment(value: 0, label: Text('All')),
                 ],
-                selected: {_rangeYears},
-                onSelectionChanged: (s) => setState(() => _rangeYears = s.first),
+                selected: {_rangeMonths},
+                onSelectionChanged: (s) => setState(() {
+                  _rangeMonths = s.first;
+                  // Keep a sensible number of bars for the range.
+                  if (_rangeMonths == 0 && _period == Period.week) _period = Period.month;
+                  if (_rangeMonths == 6 && _period == Period.year) _period = Period.month;
+                }),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<Period>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: Period.week, label: Text('Weekly')),
+                  ButtonSegment(value: Period.month, label: Text('Monthly')),
+                  ButtonSegment(value: Period.year, label: Text('Yearly')),
+                ],
+                selected: {_period},
+                onSelectionChanged: (s) => setState(() => _period = s.first),
               ),
               const SizedBox(height: 12),
               _ChartCard(
-                title: 'Distance per year · km',
-                caption: years.isEmpty ? '' : '${fmtKm(yearly[years.first]!.km)} km in ${years.first}, ${fmtKm(yearly[years.last]!.km)} km in ${years.last}${years.last == DateTime.now().year ? ' (year to date)' : ''}',
-                child: _bars(years.map((y) => (label: '${y % 100}', value: yearly[y]!.km)).toList(), cs.primary),
+                title: 'Distance per $unit · km',
+                caption: '${fmtKm(totalKm)} km in this range'
+                    '${busiest == null || busiest.km == 0 ? '' : ', most in ${_fullLabel(busiest.start)} (${fmtKm(busiest.km)} km)'}. '
+                    'Distance between two fill-ups is spread evenly over the days between them.',
+                child: _bars(series((t) => t.km), cs.primary),
               ),
               _ChartCard(
-                title: 'Cost per 100 km · \$ per year',
-                caption: years.isEmpty ? '' : '\$${yearly[years.first]!.costPer100?.toStringAsFixed(1)} in ${years.first}, \$${yearly[years.last]!.costPer100?.toStringAsFixed(1)} in ${years.last}',
-                child: _bars(years.map((y) => (label: '${y % 100}', value: yearly[y]!.costPer100 ?? 0)).toList(), cs.tertiary),
+                title: 'Fuel spend per $unit · \$',
+                caption: '${fmtMoney0(totalCost)} in this range',
+                child: _bars(series((t) => t.cost), cs.tertiary),
               ),
               _ChartCard(
-                title: 'Price per litre · \$ per year',
-                caption: years.isEmpty ? '' : '\$${yearly[years.first]!.pricePerUnit?.toStringAsFixed(2)} in ${years.first}, \$${yearly[years.last]!.pricePerUnit?.toStringAsFixed(2)} in ${years.last}',
-                child: _bars(years.map((y) => (label: '${y % 100}', value: yearly[y]!.pricePerUnit ?? 0)).toList(), cs.tertiary),
+                title: 'Cost per 100 km · \$ per $unit',
+                caption: totalKm > 0 ? 'Average \$${(totalCost / totalKm * 100).toStringAsFixed(2)} per 100 km over the range' : '',
+                child: _bars(series((t) => t.costPer100), cs.tertiary),
+              ),
+              _ChartCard(
+                title: 'Price per litre · \$ per $unit',
+                caption: 'Average of the fill-ups made in each $unit. Empty bars had no fill-up.',
+                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2),
               ),
               _ChartCard(
                 title: 'Fuel economy · L/100 km, rolling 5 fills',
@@ -74,14 +108,14 @@ class _InsightsPageState extends State<InsightsPage> {
                 child: _economy(stats, cs.primary),
               ),
               _ChartCard(
-                title: 'Driving by month · average km per day',
+                title: 'Driving by month of year · average km per day',
                 caption: _busiestMonths(byMonth),
-                child: _bars([for (var m = 1; m <= 12; m++) (label: 'JFMAMJJASOND'[m - 1], value: byMonth[m] ?? 0)], cs.primary),
+                child: _bars([for (var m = 1; m <= 12; m++) _Bar('JFMAMJJASOND'[m - 1], DateFormat('MMMM').format(DateTime(2000, m)), byMonth[m] ?? 0)], cs.primary),
               ),
               _ChartCard(
                 title: 'Fill-ups by weekday',
-                caption: '${byDow.sublist(0, 5).fold(0, (a, b) => a + b)} weekday · ${byDow[5] + byDow[6]} weekend. Weekday vs weekend driving needs recorded trips.',
-                child: _bars([for (var d = 0; d < 7; d++) (label: 'MTWTFSS'[d], value: byDow[d].toDouble())], cs.primary),
+                caption: '${byDow.sublist(0, 5).fold(0, (a, b) => a + b)} weekday · ${byDow[5] + byDow[6]} weekend. Weekday vs weekend driving comes from recorded trips.',
+                child: _bars([for (var d = 0; d < 7; d++) _Bar('MTWTFSS'[d], DateFormat('EEEE').format(DateTime(2024, 1, d + 1)), byDow[d].toDouble())], cs.primary, decimals: 0),
               ),
             ],
           );
@@ -90,12 +124,33 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
-  Widget _bars(List<({String label, double value})> data, Color color) {
+  /// Short label under a bar, thinned out so labels never overlap.
+  String _axisLabel(List<PeriodTotals> ps, int i) {
+    final n = ps.length;
+    final step = (n / 7).ceil().clamp(1, 1000);
+    if (i % step != 0) return '';
+    final d = ps[i].start;
+    return switch (_period) {
+      Period.week => DateFormat('d MMM').format(d),
+      Period.month => n <= 12 ? DateFormat('MMM').format(d) : DateFormat("MMM ''yy").format(d),
+      Period.year => "'${d.year % 100}",
+    };
+  }
+
+  String _fullLabel(DateTime d) => switch (_period) {
+        Period.week => 'week of ${DateFormat('d MMM yyyy').format(d)}',
+        Period.month => DateFormat('MMM yyyy').format(d),
+        Period.year => '${d.year}',
+      };
+
+  Widget _bars(List<_Bar> data, Color color, {int? decimals}) {
     if (data.isEmpty) return const SizedBox();
     final maxV = data.map((d) => d.value).fold(0.0, (a, b) => a > b ? a : b);
+    final width = data.length > 40 ? 3.0 : data.length > 20 ? 6.0 : data.length > 12 ? 9.0 : 14.0;
     return BarChart(
       BarChartData(
         maxY: maxV == 0 ? 1 : maxV * 1.15,
+        alignment: BarChartAlignment.spaceAround,
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
@@ -108,26 +163,32 @@ class _InsightsPageState extends State<InsightsPage> {
               reservedSize: 22,
               getTitlesWidget: (v, meta) {
                 final i = v.toInt();
-                if (i < 0 || i >= data.length) return const SizedBox();
-                return Text(data[i].label, style: const TextStyle(fontSize: 10));
+                if (i < 0 || i >= data.length || data[i].label.isEmpty) return const SizedBox();
+                return Text(data[i].label, style: const TextStyle(fontSize: 10), maxLines: 1, overflow: TextOverflow.visible, softWrap: false);
               },
             ),
           ),
         ),
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
-            getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(_fmt(rod.toY), const TextStyle(color: Colors.white)),
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+              '${data[g.x].tooltip}\n${_fmt(rod.toY, decimals)}',
+              const TextStyle(color: Colors.white, fontSize: 12),
+            ),
           ),
         ),
         barGroups: [
           for (var i = 0; i < data.length; i++)
-            BarChartGroupData(x: i, barRods: [BarChartRodData(toY: data[i].value, color: color, width: data.length > 12 ? 8 : 14, borderRadius: BorderRadius.circular(3))]),
+            BarChartGroupData(x: i, barRods: [BarChartRodData(toY: data[i].value, color: color, width: width, borderRadius: BorderRadius.circular(width > 6 ? 3 : 1))]),
         ],
       ),
     );
   }
 
-  String _fmt(double v) => v >= 100 ? fmtKm(v) : v.toStringAsFixed(v >= 10 ? 1 : 2);
+  String _fmt(double v, [int? decimals]) =>
+      decimals != null ? v.toStringAsFixed(decimals) : (v >= 100 ? fmtKm(v) : v.toStringAsFixed(v >= 10 ? 1 : 2));
 
   Widget _economy(List<TankStat> stats, Color color) {
     final dots = <FlSpot>[];
@@ -183,6 +244,12 @@ class _InsightsPageState extends State<InsightsPage> {
     final sorted = byMonth.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return 'Busiest ${names[sorted.first.key - 1]} (${sorted.first.value.toStringAsFixed(0)} km/day), quietest ${names[sorted.last.key - 1]} (${sorted.last.value.toStringAsFixed(0)} km/day)';
   }
+}
+
+class _Bar {
+  final String label, tooltip;
+  final double value;
+  const _Bar(this.label, this.tooltip, this.value);
 }
 
 class _ChartCard extends StatelessWidget {
