@@ -4,7 +4,7 @@ A personal mileage app: log petrol fill-ups (and, later, EV charges), see fuel e
 
 Android first, built with Flutter so an iPhone build and a read-only web view can follow from the same code.
 
-Status: **phase 4**: fill-ups, history, insights (weekly, monthly, yearly), import, backup and Sheets sync; GPS trip recording with Bluetooth auto-start; car care (service schedule, insurance, tyre pressures); home screen widgets (fill-up, trip start/stop, summary) and reminder notifications for service, WOF, rego, insurance, tyres and low fuel. See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+Status: **phase 5**: fill-ups, history, insights (weekly, monthly, yearly), import, backup and Sheets sync; GPS trip recording with Bluetooth auto-start; car care (service schedule, insurance, tyre pressures); home screen widgets (fill-up, trip start/stop, summary) and reminder notifications for service, WOF, rego, insurance, tyres and low fuel; fuel price check against MBIE's weekly national averages, with a shortcut to Gaspy. See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
 
 ## Building and updating the Android app
 
@@ -73,3 +73,7 @@ sample_data/     fictional sheet and Road Trip exports in the real import format
 scripts/         privacy check and helpers
 .githooks/       pre-commit hook (enable with core.hooksPath)
 ```
+
+## Fuel prices
+
+`lib/prices/national_prices.dart` downloads MBIE's public weekly fuel price monitoring table (national average board price per fuel, in cents per litre) at most every three days and keeps a copy on the phone. `lib/domain/prices.dart` compares each fill-up with the national average for its week and ranks your stations by their average difference. Gaspy has no public API, so the app only opens Gaspy (package `nz.hwem.gaspy`) for live station prices.

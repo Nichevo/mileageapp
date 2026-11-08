@@ -5,7 +5,10 @@ import 'package:geolocator/geolocator.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../domain/prices.dart';
+import '../prices/national_prices.dart';
 import 'format.dart';
+import 'prices_page.dart' show openGaspy, gaspyAvailable;
 
 const fuelTypes = ['91', '95', '98', 'diesel'];
 const paymentTags = ['Pump price', 'Sharetank', 'AA Smartfuel', 'Voucher'];
@@ -36,6 +39,7 @@ class _FillUpFormState extends State<FillUpForm> {
   bool _locating = false;
   bool _saving = false;
   List<Station> _stations = const [];
+  NationalPrices? _national;
 
   @override
   void initState() {
@@ -72,6 +76,10 @@ class _FillUpFormState extends State<FillUpForm> {
       }
     });
     if (widget.existing == null && scope.settings.useGps) _locate();
+    try {
+      final n = await NationalPriceSource.load();
+      if (mounted) setState(() => _national = n);
+    } catch (_) {}
   }
 
   Future<void> _locate() async {
@@ -256,6 +264,12 @@ class _FillUpFormState extends State<FillUpForm> {
               ].join(' · '),
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (_nationalLine(price) != null || gaspyAvailable)
+              Row(children: [
+                Expanded(child: Text(_nationalLine(price) ?? '', style: Theme.of(context).textTheme.bodySmall)),
+                if (gaspyAvailable)
+                  TextButton.icon(onPressed: () => openGaspy(context), icon: const Icon(Icons.open_in_new, size: 16), label: const Text('Gaspy')),
+              ]),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Filled to full'),
@@ -319,6 +333,16 @@ class _FillUpFormState extends State<FillUpForm> {
         ),
       ),
     );
+  }
+
+  /// "National average $2.79/L that week · you paid 6c under".
+  String? _nationalLine(double? price) {
+    final cents = _national?.centsAt(mbieFuelFor(_fuelType), _at);
+    if (cents == null) return null;
+    final base = 'National average ${fmtPrice(cents / 100)} that week';
+    if (price == null) return base;
+    final diff = price * 100 - cents;
+    return diff.round() == 0 ? '$base · about the same' : '$base · you paid ${diff.abs().round()}c ${diff < 0 ? 'less' : 'more'}';
   }
 
   @override

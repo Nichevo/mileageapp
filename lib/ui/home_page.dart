@@ -9,6 +9,7 @@ import '../domain/stats.dart';
 import 'care_page.dart';
 import 'fillup_form.dart';
 import 'format.dart';
+import 'prices_page.dart' show FuelPriceCard;
 import 'import_page.dart';
 
 class HomePage extends StatelessWidget {
@@ -67,6 +68,7 @@ class _Dashboard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const ComingUpCard(),
+          FuelPriceCard(events: events),
           if ((latestEconomyChange(stats) ?? 0) >= 0.15)
             Card(
               margin: const EdgeInsets.only(bottom: 12),

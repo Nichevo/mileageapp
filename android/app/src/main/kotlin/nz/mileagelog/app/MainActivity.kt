@@ -109,6 +109,25 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(true)
                 }
+                "openApp" -> {
+                    // Opens another app, or its Play Store page when it isn't installed.
+                    val pkg = call.argument<String>("package") ?: ""
+                    val launch = packageManager.getLaunchIntentForPackage(pkg)
+                    try {
+                        if (launch != null) {
+                            startActivity(launch)
+                        } else {
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")))
+                            } catch (e: Exception) {
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")))
+                            }
+                        }
+                        result.success(launch != null)
+                    } catch (e: Exception) {
+                        result.error("open_failed", e.message, null)
+                    }
+                }
                 "openAppSettings" -> {
                     startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
                     result.success(true)

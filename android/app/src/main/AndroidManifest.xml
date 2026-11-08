@@ -82,6 +82,8 @@
             android:value="2" />
     </application>
     <queries>
+        <!-- Gaspy, so "Check Gaspy" can open it when installed. -->
+        <package android:name="nz.hwem.gaspy"/>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
