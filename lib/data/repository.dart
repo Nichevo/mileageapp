@@ -113,9 +113,95 @@ class Repository {
             ..orderBy([(e) => OrderingTerm.desc(e.at)]))
           .watch();
 
+  Future<List<Expense>> expenses(String vehicleId) => (db.select(db.expenses)
+        ..where((e) => e.vehicleId.equals(vehicleId))
+        ..orderBy([(e) => OrderingTerm.desc(e.at)]))
+      .get();
+
   Future<void> upsertExpense(ExpensesCompanion e) => db.into(db.expenses).insertOnConflictUpdate(e);
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
+
+  // ---- car care ----------------------------------------------------------
+
+  Stream<List<ServiceItem>> watchServiceItems(String vehicleId) =>
+      (db.select(db.serviceItems)
+            ..where((s) => s.vehicleId.equals(vehicleId) & s.active.equals(true))
+            ..orderBy([(s) => OrderingTerm.asc(s.createdAt)]))
+          .watch();
+
+  Future<void> upsertServiceItem(ServiceItemsCompanion s) => db.into(db.serviceItems).insertOnConflictUpdate(s);
+
+  Future<void> deleteServiceItem(String id) => db.transaction(() async {
+        await (db.update(db.expenses)..where((e) => e.serviceItemId.equals(id)))
+            .write(const ExpensesCompanion(serviceItemId: Value(null)));
+        await (db.delete(db.serviceItems)..where((s) => s.id.equals(id))).go();
+      });
+
+  /// Records a service as an expense and marks the given schedule items done.
+  Future<void> logService({
+    required String vehicleId,
+    required DateTime at,
+    required double? odometerKm,
+    required String kind,
+    required String description,
+    required double cost,
+    String? location,
+    String? notes,
+    List<String> itemIds = const [],
+  }) =>
+      db.transaction(() async {
+        await db.into(db.expenses).insert(ExpensesCompanion.insert(
+              id: newId(),
+              vehicleId: vehicleId,
+              at: at,
+              odometerKm: Value(odometerKm),
+              kind: kind,
+              description: description,
+              cost: cost,
+              location: Value(location),
+              notes: Value(notes),
+              serviceItemId: Value(itemIds.isEmpty ? null : itemIds.first),
+            ));
+        for (final id in itemIds) {
+          final item = await (db.select(db.serviceItems)..where((s) => s.id.equals(id))).getSingleOrNull();
+          if (item == null) continue;
+          // Only move "last done" forward, so logging an old record doesn't
+          // pull the schedule back.
+          if (item.lastDoneAt == null || !at.isBefore(item.lastDoneAt!)) {
+            await (db.update(db.serviceItems)..where((s) => s.id.equals(id)))
+                .write(ServiceItemsCompanion(lastDoneAt: Value(at), lastDoneKm: Value(odometerKm)));
+          }
+        }
+      });
+
+  Stream<List<InsurancePolicy>> watchPolicies(String vehicleId) =>
+      (db.select(db.insurancePolicies)
+            ..where((p) => p.vehicleId.equals(vehicleId))
+            ..orderBy([(p) => OrderingTerm.desc(p.startAt)]))
+          .watch();
+
+  Future<void> upsertPolicy(InsurancePoliciesCompanion p) => db.into(db.insurancePolicies).insertOnConflictUpdate(p);
+
+  Future<void> deletePolicy(String id) => (db.delete(db.insurancePolicies)..where((p) => p.id.equals(id))).go();
+
+  Stream<List<TyreSet>> watchTyreSets(String vehicleId) =>
+      (db.select(db.tyreSets)
+            ..where((t) => t.vehicleId.equals(vehicleId))
+            ..orderBy([(t) => OrderingTerm.desc(t.fittedAt)]))
+          .watch();
+
+  Future<void> upsertTyreSet(TyreSetsCompanion t) => db.into(db.tyreSets).insertOnConflictUpdate(t);
+
+  Stream<List<TyreCheck>> watchTyreChecks(String vehicleId) =>
+      (db.select(db.tyreChecks)
+            ..where((t) => t.vehicleId.equals(vehicleId))
+            ..orderBy([(t) => OrderingTerm.desc(t.at)]))
+          .watch();
+
+  Future<void> upsertTyreCheck(TyreChecksCompanion t) => db.into(db.tyreChecks).insertOnConflictUpdate(t);
+
+  Future<void> deleteTyreCheck(String id) => (db.delete(db.tyreChecks)..where((t) => t.id.equals(id))).go();
 
   // ---- trips -------------------------------------------------------------
 

@@ -5,6 +5,7 @@ import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/stats.dart';
+import 'care_page.dart';
 import 'fillup_form.dart';
 import 'format.dart';
 import 'import_page.dart';
@@ -64,6 +65,7 @@ class _Dashboard extends StatelessWidget {
             label: const Text('Log a fill-up', style: TextStyle(fontSize: 16)),
           ),
           const SizedBox(height: 12),
+          const ComingUpCard(),
           if (events.isEmpty)
             Card(
               child: Padding(

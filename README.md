@@ -4,7 +4,7 @@ A personal mileage app: log petrol fill-ups (and, later, EV charges), see fuel e
 
 Android first, built with Flutter so an iPhone build and a read-only web view can follow from the same code.
 
-Status: **phase 2** (phase 1 fill-ups, history, insights, import, backup and Sheets sync, plus GPS trip recording with Bluetooth auto-start). See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+Status: **phase 3**: fill-ups, history, insights (weekly, monthly, yearly), import, backup and Sheets sync; GPS trip recording with Bluetooth auto-start; car care (service schedule, insurance, tyre pressures). See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
 
 ## Building and updating the Android app
 

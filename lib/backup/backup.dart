@@ -32,6 +32,8 @@ Future<String> exportBackupJson(AppDatabase db) async {
     'trip_stops': await dump(db.tripStops),
     'tyre_sets': await dump(db.tyreSets),
     'tyre_checks': await dump(db.tyreChecks),
+    'service_items': await dump(db.serviceItems),
+    'insurance_policies': await dump(db.insurancePolicies),
   };
   return const JsonEncoder.withIndent('  ').convert(data);
 }
@@ -73,13 +75,21 @@ Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json) async {
     await load('trip_stops', db.tripStops, TripStop.fromJson);
     await load('tyre_sets', db.tyreSets, TyreSet.fromJson);
     await load('tyre_checks', db.tyreChecks, TyreCheck.fromJson);
-    // Trip points use an autoincrement key; re-insert only if the trip has none.
+    await load('service_items', db.serviceItems, ServiceItem.fromJson);
+    await load('insurance_policies', db.insurancePolicies, InsurancePolicy.fromJson);
+    // Trip points use an autoincrement key, so they can't be merged by id.
+    // Restore a trip's points only when the phone has none for that trip.
     final points = (data['trip_points'] as List?) ?? const [];
+    final hadPoints = <String, bool>{};
     var n = 0;
     for (final item in points) {
       final p = TripPoint.fromJson(item as Map<String, dynamic>);
-      final exists = await (db.select(db.tripPoints)..where((x) => x.tripId.equals(p.tripId))..limit(1)).get();
-      if (exists.isNotEmpty) continue;
+      final skip = hadPoints[p.tripId] ??= (await (db.select(db.tripPoints)
+                ..where((x) => x.tripId.equals(p.tripId))
+                ..limit(1))
+              .get())
+          .isNotEmpty;
+      if (skip) continue;
       await db.into(db.tripPoints).insert(p.toCompanion(true).copyWith(seq: const Value.absent()));
       n++;
     }

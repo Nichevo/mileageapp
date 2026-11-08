@@ -95,6 +95,53 @@ class Expenses extends Table {
   IntColumn get reminderKm => integer().nullable()();
   TextColumn get source => text().withDefault(const Constant('app'))();
   TextColumn get sourceRef => text().nullable()();
+  /// v3: the service schedule item this record completed, if any.
+  TextColumn get serviceItemId => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// v3: something that needs doing every so many months and/or kilometres,
+/// such as an oil change, WOF or registration.
+@DataClassName('ServiceItem')
+class ServiceItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  TextColumn get name => text()();
+  /// Expense kind used when it's logged: 'service', 'wof', 'rego', 'tyres', 'other'
+  TextColumn get kind => text().withDefault(const Constant('service'))();
+  IntColumn get intervalMonths => integer().nullable()();
+  IntColumn get intervalKm => integer().nullable()();
+  DateTimeColumn get lastDoneAt => dateTime().nullable()();
+  RealColumn get lastDoneKm => real().nullable()();
+  TextColumn get notes => text().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// v3: one insurance policy period. Kept as history so the insured value
+/// over the years can be shown.
+@DataClassName('InsurancePolicy')
+class InsurancePolicies extends Table {
+  TextColumn get id => text()();
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  TextColumn get insurer => text()();
+  /// 'comprehensive', 'third_party_fire_theft', 'third_party'
+  TextColumn get cover => text().withDefault(const Constant('comprehensive'))();
+  /// Stays on the phone; never synced to Sheets.
+  TextColumn get policyNumber => text().nullable()();
+  RealColumn get insuredValue => real().nullable()();
+  /// 'agreed' or 'market'
+  TextColumn get valueType => text().nullable()();
+  RealColumn get premium => real().nullable()();
+  /// 'year' or 'month'
+  TextColumn get premiumPeriod => text().withDefault(const Constant('year'))();
+  RealColumn get excess => real().nullable()();
+  DateTimeColumn get startAt => dateTime()();
+  DateTimeColumn get renewAt => dateTime().nullable()();
+  TextColumn get notes => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -213,13 +260,15 @@ class SyncQueue extends Table {
   TyreSets,
   TyreChecks,
   SyncQueue,
+  ServiceItems,
+  InsurancePolicies,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -232,6 +281,11 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(trips, trips.startedBy);
             await m.addColumn(trips, trips.statsJson);
             await m.createIndex(Index('trip_points_trip', 'CREATE INDEX IF NOT EXISTS trip_points_trip ON trip_points (trip_id, at)'));
+          }
+          if (from < 3) {
+            await m.addColumn(expenses, expenses.serviceItemId);
+            await m.createTable(serviceItems);
+            await m.createTable(insurancePolicies);
           }
         },
         beforeOpen: (details) async {

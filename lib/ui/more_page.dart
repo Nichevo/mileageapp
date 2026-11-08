@@ -11,6 +11,7 @@ import '../app.dart';
 import '../backup/backup.dart';
 import '../sync/sheets_sync.dart';
 import 'format.dart';
+import 'care_page.dart';
 import 'import_page.dart';
 import 'vehicle_page.dart';
 
@@ -153,6 +154,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Vehicle'),
             subtitle: const Text('Name, tank size, rated economy'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.handyman_outlined),
+            title: const Text('Car care'),
+            subtitle: const Text('Service schedule, insurance, tyres'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CarCarePage())),
           ),
           ListTile(
             leading: const Icon(Icons.upload_file_outlined),

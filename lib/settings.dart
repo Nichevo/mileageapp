@@ -18,6 +18,10 @@ class Settings {
   bool get sheetsSyncEnabled => _p.getBool('sheetsSyncEnabled') ?? false;
   Future<void> setSheetsSyncEnabled(bool v) => _p.setBool('sheetsSyncEnabled', v);
 
+  /// Tyre pressures are stored in kPa and shown in psi unless changed.
+  bool get pressurePsi => _p.getBool('pressurePsi') ?? true;
+  Future<void> setPressurePsi(bool v) => _p.setBool('pressurePsi', v);
+
   bool get useGps => _p.getBool('useGps') ?? true;
   Future<void> setUseGps(bool v) => _p.setBool('useGps', v);
 
