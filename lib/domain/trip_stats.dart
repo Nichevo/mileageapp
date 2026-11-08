@@ -48,6 +48,8 @@ class TripStats {
   final double maxKmh;
   final int shortStops;
   final List<StopSpan> stops;
+  /// Where the short stops were. Not stored in the summary JSON.
+  final List<StopSpan> shortStopSpans;
   final Map<SpeedBand, double> bandKm;
   final Map<SpeedBand, Duration> bandTime;
   final double elevationGainM;
@@ -61,6 +63,7 @@ class TripStats {
     required this.maxKmh,
     required this.shortStops,
     required this.stops,
+    this.shortStopSpans = const [],
     required this.bandKm,
     required this.bandTime,
     required this.elevationGainM,
@@ -180,6 +183,7 @@ TripStats computeTripStats(List<GpsSample> raw) {
   final bandTime = <SpeedBand, Duration>{};
   var shortStops = 0, brakes = 0, accels = 0;
   final stops = <StopSpan>[];
+  final shortSpans = <StopSpan>[];
 
   DateTime? stillSince;
   GpsSample? stillAt;
@@ -192,6 +196,7 @@ TripStats computeTripStats(List<GpsSample> raw) {
     final d = until.difference(stillSince!);
     if (d >= shortStopMin && d <= shortStopMax) {
       shortStops++;
+      shortSpans.add(StopSpan(stillSince!, until, stillAt!.lat, stillAt!.lon));
     } else if (d > shortStopMax) {
       stops.add(StopSpan(stillSince!, until, stillAt!.lat, stillAt!.lon));
     }
@@ -258,6 +263,7 @@ TripStats computeTripStats(List<GpsSample> raw) {
     maxKmh: maxKmh,
     shortStops: shortStops,
     stops: stops,
+    shortStopSpans: shortSpans,
     bandKm: bandKm,
     bandTime: bandTime,
     elevationGainM: elev,

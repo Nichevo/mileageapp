@@ -4,8 +4,10 @@ import 'package:latlong2/latlong.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../domain/road_match.dart';
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
+import '../trips/road_lookup.dart';
 import 'format.dart';
 import 'trip_format.dart';
 import 'trip_map.dart';
@@ -23,6 +25,29 @@ class _TripDetailPageState extends State<TripDetailPage> {
   List<TripStop> _stops = const [];
   TripStats? _stats;
   ({double per100, double price})? _fuel;
+  bool _roadBusy = false, _roadTried = false;
+  String? _roadError;
+
+  Future<void> _lookupRoads() async {
+    final repo = AppScope.of(context).repo;
+    setState(() {
+      _roadBusy = true;
+      _roadTried = true;
+      _roadError = null;
+    });
+    String? error;
+    try {
+      final r = await RoadLookup.analyse(repo, widget.tripId);
+      if (r == null) error = 'This trip is too short to look up.';
+    } catch (_) {
+      error = 'Couldn\'t reach OpenStreetMap. Check the connection and try again.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _roadBusy = false;
+      _roadError = error;
+    });
+  }
 
   @override
   void initState() {
@@ -102,6 +127,12 @@ class _TripDetailPageState extends State<TripDetailPage> {
       stream: scope.repo.watchTrip(widget.tripId),
       builder: (context, snap) {
         final trip = snap.data;
+        final road = RoadLookup.stored(trip?.statsJson);
+        if (trip != null && road == null && !_roadTried && _stats != null && scope.settings.roadLookup) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_roadTried) _lookupRoads();
+          });
+        }
         return Scaffold(
           appBar: AppBar(
             title: Text(trip?.name ?? 'Trip'),
@@ -120,6 +151,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                         child: TripMap(
                           route: [for (final p in _points!) if ((p.accuracyM ?? 0) <= maxAccuracyM) LatLng(p.lat, p.lon)],
                           stops: [for (final s in _stops) if (s.lat != null) LatLng(s.lat!, s.lon!)],
+                          lights: [for (final l in road?.lights ?? const <LightPass>[]) (at: LatLng(l.lat, l.lon), stopped: l.stopped)],
                         ),
                       ),
                     Padding(
@@ -135,7 +167,8 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           ),
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
-                          if (_stats != null) ..._statsSection(context, _stats!) else _reportSection(context, trip),
+                          if (_stats != null) ..._statsSection(context, _stats!, road) else _reportSection(context, trip),
+                          if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
                         ],
                       ),
                     ),
@@ -146,7 +179,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     );
   }
 
-  List<Widget> _statsSection(BuildContext context, TripStats s) {
+  List<Widget> _statsSection(BuildContext context, TripStats s, RoadStats? road) {
     final t = Theme.of(context).textTheme;
     final litres = _fuel == null ? null : s.distanceKm * _fuel!.per100 / 100;
     final tiles = <(String, String)>[
@@ -159,6 +192,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
       ('Top speed', fmtKmh(s.maxKmh)),
       ('Short stops', '${s.shortStops}'),
       ('Longer stops', '${s.stops.length}'),
+      if (road != null && road.lightsPassed > 0) ...[
+        ('Traffic lights', '${road.stoppedAtLights} red of ${road.lightsPassed}'),
+        ('Waiting at lights', fmtDuration(road.waitAtLights)),
+      ],
       ('Climb', '${s.elevationGainM.round()} m'),
       ('Harsh braking', '${s.harshBrakes}'),
       ('Hard acceleration', '${s.harshAccels}'),
@@ -201,6 +238,45 @@ class _TripDetailPageState extends State<TripDetailPage> {
     ];
   }
 
+  Widget _roadSection(BuildContext context, RoadStats? road) {
+    final t = Theme.of(context).textTheme;
+    if (road == null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Road types and traffic lights', style: t.titleSmall),
+        const SizedBox(height: 8),
+        if (_roadBusy)
+          const Row(children: [
+            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 12),
+            Text('Looking up the roads on OpenStreetMap…'),
+          ])
+        else ...[
+          if (_roadError != null) ...[Text(_roadError!, style: t.bodySmall), const SizedBox(height: 8)],
+          OutlinedButton.icon(
+            onPressed: _lookupRoads,
+            icon: const Icon(Icons.traffic_outlined),
+            label: Text(_roadError == null ? 'Look up road types and traffic lights' : 'Try again'),
+          ),
+        ],
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Road types', style: t.titleSmall),
+      const SizedBox(height: 8),
+      RoadBar(roadKm: road.roadKm),
+      const SizedBox(height: 6),
+      Text(
+        road.lightsPassed == 0
+            ? 'No traffic lights on this route.'
+            : 'You went through ${road.lightsPassed} sets of traffic lights and stopped at ${road.stoppedAtLights}, '
+                'waiting ${fmtDuration(road.waitAtLights)} in total. They are marked on the map: red where you stopped, green where you didn\'t.',
+        style: t.bodySmall,
+      ),
+      const SizedBox(height: 4),
+      Text('From OpenStreetMap. The first and last 300 m aren\'t looked up, so lights right next to the start or end aren\'t counted.', style: t.bodySmall),
+    ]);
+  }
+
   Widget _reportSection(BuildContext context, Trip trip) {
     final t = Theme.of(context).textTheme;
     final km = trip.startOdometerKm != null && trip.endOdometerKm != null ? trip.endOdometerKm! - trip.startOdometerKm! : trip.gpsDistanceKm;
@@ -213,5 +289,48 @@ class _TripDetailPageState extends State<TripDetailPage> {
         Text(trip.status == 'report' ? 'Imported from the old app, so there is no GPS route.' : 'Not enough GPS points were recorded for stats.', style: t.bodySmall),
       ],
     );
+  }
+}
+
+/// Horizontal bar showing distance by road type.
+class RoadBar extends StatelessWidget {
+  final Map<RoadClass, double> roadKm;
+  const RoadBar({super.key, required this.roadKm});
+
+  static Color colorFor(RoadClass c) => switch (c) {
+        RoadClass.motorway => Colors.indigo.shade400,
+        RoadClass.main => Colors.teal.shade500,
+        RoadClass.suburban => Colors.amber.shade700,
+        RoadClass.local => Colors.deepOrange.shade400,
+        RoadClass.other => Colors.grey.shade500,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final shares = roadShares(roadKm);
+    if (shares.isEmpty) return const SizedBox.shrink();
+    final shown = [for (final c in RoadClass.values) if ((shares[c] ?? 0) > 0) c];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          height: 14,
+          child: Row(children: [
+            for (final c in shown)
+              Expanded(flex: ((shares[c] ?? 0) * 1000).round().clamp(1, 1000), child: Container(color: colorFor(c))),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Wrap(spacing: 14, runSpacing: 4, children: [
+        for (final c in shown)
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 10, height: 10, decoration: BoxDecoration(color: colorFor(c), borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 4),
+            Text('${roadLabel(c)} ${((shares[c] ?? 0) * 100).round()}% · ${fmtKm1(roadKm[c] ?? 0)} km', style: t.bodySmall),
+          ]),
+      ]),
+    ]);
   }
 }

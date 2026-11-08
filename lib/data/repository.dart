@@ -231,6 +231,9 @@ class Repository {
   Future<void> renameTrip(String id, String name, {String? notes}) =>
       (db.update(db.trips)..where((t) => t.id.equals(id))).write(TripsCompanion(name: Value(name), notes: Value(notes)));
 
+  Future<void> setTripStatsJson(String id, String json) =>
+      (db.update(db.trips)..where((t) => t.id.equals(id))).write(TripsCompanion(statsJson: Value(json)));
+
   Future<void> deleteTrip(String id) => db.transaction(() async {
         await (db.delete(db.tripPoints)..where((p) => p.tripId.equals(id))).go();
         await (db.delete(db.tripStops)..where((s) => s.tripId.equals(id))).go();

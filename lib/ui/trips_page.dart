@@ -8,6 +8,7 @@ import '../app.dart';
 import '../data/database.dart';
 import '../domain/trip_stats.dart';
 import '../trips/recorder.dart';
+import '../trips/road_lookup.dart';
 import 'format.dart';
 import 'trip_detail_page.dart';
 import 'trip_format.dart';
@@ -49,6 +50,7 @@ class _TripsPageState extends State<TripsPage> {
     // save it into the database.
     if (id != _currentId || id == null) {
       await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
+      if (scope.settings.roadLookup) RoadLookup.analyseRecent(scope.repo, scope.settings.activeVehicleId!);
     }
     final car = _car == null || id != _currentId ? await TripRecorder.car() : _car;
     if (!mounted) return;
@@ -237,11 +239,13 @@ class _TripsPageState extends State<TripsPage> {
     final s = trip.statsJson == null ? null : TripStats.fromJson(jsonDecode(trip.statsJson!) as Map<String, Object?>);
     final odoKm = trip.startOdometerKm != null && trip.endOdometerKm != null ? trip.endOdometerKm! - trip.startOdometerKm! : null;
     final km = s?.distanceKm ?? trip.gpsDistanceKm ?? odoKm;
+    final road = RoadLookup.stored(trip.statsJson);
     final parts = <String>[
       fmtDate(trip.startAt),
       if (km != null) '${fmtKm1(km)} km',
       if (s != null) fmtDuration(s.total),
       if (s?.movingAvgKmh != null) 'avg ${fmtKmh(s!.movingAvgKmh)}',
+      if (road != null && road.lightsPassed > 0) '${road.stoppedAtLights} of ${road.lightsPassed} lights red',
       if (trip.status == 'report') 'odometer only',
     ];
     return ListTile(

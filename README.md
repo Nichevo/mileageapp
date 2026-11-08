@@ -4,7 +4,7 @@ A personal mileage app: log petrol fill-ups (and, later, EV charges), see fuel e
 
 Android first, built with Flutter so an iPhone build and a read-only web view can follow from the same code.
 
-Status: **phase 3**: fill-ups, history, insights (weekly, monthly, yearly), import, backup and Sheets sync; GPS trip recording with Bluetooth auto-start; car care (service schedule, insurance, tyre pressures); home screen widgets (fill-up, trip start/stop, summary) and reminder notifications for service, WOF, rego, insurance, tyres and low fuel. See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
+Status: **phase 4**: fill-ups, history, insights (weekly, monthly, yearly), import, backup and Sheets sync; GPS trip recording with Bluetooth auto-start; car care (service schedule, insurance, tyre pressures); home screen widgets (fill-up, trip start/stop, summary) and reminder notifications for service, WOF, rego, insurance, tyres and low fuel. See [docs/PLAN.md](docs/PLAN.md) for the product and technical plan, [docs/mockups/screens.html](docs/mockups/screens.html) for the screen mock-ups (open in a browser), and [docs/icon](docs/icon) for the adaptive icon layers.
 
 ## Building and updating the Android app
 
@@ -33,7 +33,9 @@ flutter run
 
 Trips are recorded by a native Android foreground service (`TripRecorderService`) so they continue with the screen off or the app closed. GPS sampling adapts to speed to save battery: every 2 s below about 20 km/h (to catch short stops), every 5 s or 25 m when moving faster, and every 15 s after three minutes parked. Fixes are appended to a file in the app's private storage and imported into the database when the trip ends; stats (moving average, short stops, speed bands, harsh braking, climb) are computed in `lib/domain/trip_stats.dart`.
 
-Bluetooth auto-start uses a manifest receiver for the car's connect and disconnect broadcasts. A trip starts when the chosen car connects and stops two minutes after it disconnects. Routes stay on the phone (and in the JSON backup); only map tiles are fetched from OpenStreetMap.
+Bluetooth auto-start uses a manifest receiver for the car's connect and disconnect broadcasts. A trip starts when the chosen car connects and stops two minutes after it disconnects. Routes stay on the phone (and in the JSON backup), apart from the optional road lookup below.
+
+Road types and traffic lights (`lib/domain/road_match.dart`, `lib/trips/road_lookup.dart`): after a trip, a simplified route, minus the first and last 300 m, is sent to the public Overpass API to fetch traffic signal nodes and drivable roads nearby. The track is matched to the nearest road heading the same way (within 25 m) to split the distance into motorway, highway/main, suburban and local roads, and stops within 50 m of a signalised intersection are counted as waits at lights. It can be switched off under Trips > car settings.
 
 ## Privacy rules for this repository
 

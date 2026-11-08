@@ -8,6 +8,7 @@ import 'ui/insights_page.dart';
 import 'ui/more_page.dart';
 import 'ui/trips_page.dart';
 import 'trips/recorder.dart';
+import 'trips/road_lookup.dart';
 import 'platform/home_sync.dart';
 import 'ui/care_page.dart';
 import 'ui/fillup_form.dart';
@@ -113,6 +114,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     try {
       await _handleLaunchAction();
       await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
+      if (scope.settings.roadLookup) RoadLookup.analyseRecent(scope.repo, scope.settings.activeVehicleId!);
       if (await TripRecorder.consumeStartRequest()) {
         if (mounted) setState(() => _index = 2);
         if (await TripRecorder.currentTripId() == null) await TripRecorder.startManual();

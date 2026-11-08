@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app.dart';
 import '../trips/recorder.dart';
 
 /// Walks through what Android needs for trips to start by themselves when
@@ -151,6 +152,18 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
                     'If Android still blocks a background start, you\'ll get a "Connected to your car" notification instead. Tap it to start the trip. Samsung phones: also check Settings > Battery > Background usage limits and make sure MileageLog isn\'t in "Sleeping apps".',
                     style: t.bodySmall,
                   ),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Traffic lights and road types'),
+                  subtitle: const Text(
+                      'After a trip, look up the roads you drove on OpenStreetMap to count traffic lights and split the distance by road type. '
+                      'A simplified route is sent to the free Overpass service, leaving off the first and last 300 m.'),
+                  value: AppScope.of(context).settings.roadLookup,
+                  onChanged: (v) async {
+                    await AppScope.of(context).settings.setRoadLookup(v);
+                    setState(() {});
+                  },
                 ),
               ],
             ),
