@@ -16,6 +16,7 @@ import '../trips/trip_lookups.dart';
 import 'format.dart';
 import 'trip_detail_page.dart';
 import 'trip_format.dart';
+import 'route_compare_page.dart' show RoutesPage;
 import 'trip_map.dart';
 import 'places_page.dart' show askPlaceName;
 import 'trip_settings_page.dart';
@@ -116,6 +117,11 @@ class _TripsPageState extends State<TripsPage> {
       appBar: AppBar(
         title: const Text('Trips'),
         actions: [
+          IconButton(
+            tooltip: 'Routes you drive often',
+            icon: const Icon(Icons.route_outlined),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RoutesPage())),
+          ),
           IconButton(
             tooltip: 'Auto-start with your car',
             icon: const Icon(Icons.bluetooth_drive),

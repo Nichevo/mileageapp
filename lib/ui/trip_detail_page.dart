@@ -17,10 +17,12 @@ import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
 import '../trips/recorder.dart' show TripRecorder;
 import '../trips/road_lookup.dart';
+import '../trips/route_compare_service.dart';
 import '../trips/weather_lookup.dart';
 import 'format.dart';
 import 'toll_form.dart';
 import 'trip_format.dart';
+import 'route_compare_page.dart';
 import 'trip_map.dart';
 import 'trips_page.dart' show BandBar;
 
@@ -214,6 +216,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
                           if (_stats != null && trip.status == 'done') _weatherSection(context, trip),
                           if (_stats != null) ..._chartsSection(context),
+                          if (_stats != null && trip.status == 'done') _compareSection(context, trip),
                           if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
                           const SizedBox(height: 20),
                           _costsSection(context, trip, road),
@@ -228,6 +231,38 @@ class _TripDetailPageState extends State<TripDetailPage> {
   }
 
   Map<String, Object?> _statsJson = const {};
+  Future<List<StretchResult>>? _compare;
+
+  /// Stretches of this trip that other trips also drove.
+  Widget _compareSection(BuildContext context, Trip trip) {
+    final scope = AppScope.of(context);
+    _compare ??= RouteCompare.forTrip(scope.repo, trip.vehicleId, trip.id, scope.settings.places);
+    return FutureBuilder<List<StretchResult>>(
+      future: _compare,
+      builder: (context, snap) {
+        final list = snap.data ?? const <StretchResult>[];
+        if (list.isEmpty) return const SizedBox.shrink();
+        final t = Theme.of(context).textTheme;
+        return Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Compared with other trips', style: t.titleMedium),
+            for (final s in list)
+              Card(
+                margin: const EdgeInsets.only(top: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.compare_arrows),
+                  title: Text('${s.name}, driven ${s.runs.length} times'),
+                  subtitle: Text(stretchSummary(s, trip.id)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RouteComparePage(stretch: s, tripId: trip.id))),
+                ),
+              ),
+          ]),
+        );
+      },
+    );
+  }
 
   /// Weather at the time and ground elevation, or a button to look them up.
   Widget _weatherSection(BuildContext context, Trip trip) {

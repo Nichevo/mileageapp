@@ -318,6 +318,25 @@ class Repository {
         await (db.delete(db.trips)..where((t) => t.id.equals(id))).go();
       });
 
+  /// Finished trips of a vehicle, newest first.
+  Future<List<Trip>> doneTrips(String vehicleId) => (db.select(db.trips)
+        ..where((t) => t.vehicleId.equals(vehicleId) & t.status.equals('done'))
+        ..orderBy([(t) => OrderingTerm.desc(t.startAt)]))
+      .get();
+
+  /// Every GPS point of a vehicle's finished trips, by trip, in time order.
+  Future<Map<String, List<TripPoint>>> allTripPoints(String vehicleId) async {
+    final q = db.select(db.tripPoints).join([innerJoin(db.trips, db.trips.id.equalsExp(db.tripPoints.tripId))])
+      ..where(db.trips.vehicleId.equals(vehicleId) & db.trips.status.equals('done'))
+      ..orderBy([OrderingTerm.asc(db.tripPoints.tripId), OrderingTerm.asc(db.tripPoints.at)]);
+    final out = <String, List<TripPoint>>{};
+    for (final r in await q.get()) {
+      final p = r.readTable(db.tripPoints);
+      (out[p.tripId] ??= []).add(p);
+    }
+    return out;
+  }
+
   /// First and last GPS point of every recorded trip of a vehicle.
   Future<Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})>> allTripEnds(String vehicleId) async {
     final rows = await db.customSelect(
