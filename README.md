@@ -97,3 +97,7 @@ More > Z Sharetank records fuel bought ahead at a locked price. A fill-up paid w
 ## Tolls and parking
 
 Tolls and parking are expenses of kind `toll` or `parking`, optionally tied to a trip (`Expenses.tripId`). The OpenStreetMap road lookup also notes ways tagged `toll=yes`. When a trip used one and no toll is logged for it, the trip page links to the NZTA payment page and a reminder fires the next morning and the day before the 5-day deadline (off in Reminders for toll account holders).
+
+## EV running costs
+
+More > "Would an EV pay off?" takes the last 12 months of fill-ups on the current vehicle and costs the same distance as an EV (`lib/domain/ev_costs.dart`): energy use, share charged at home, public charging price and road user charges are adjustable. For EVs, Insights shows where you charge (home, public AC, fast DC) and the price paid at each. EVs, plug-in hybrids and diesels can record the odometer their RUC licence runs to, for a reminder before it runs out.

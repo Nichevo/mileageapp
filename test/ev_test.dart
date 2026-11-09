@@ -125,6 +125,8 @@ void main() {
     expect(find.textContaining(RegExp('charging spend', caseSensitive: false)), findsOneWidget);
     expect(find.textContaining(RegExp('kwh/100 km', caseSensitive: false)), findsWidgets);
     expect(find.text('Fuel'), findsNothing); // no fuel/charging switch for a pure EV
+    expect(find.text('WHERE YOU CHARGE'), findsOneWidget);
+    expect(find.textContaining('Fast DC 50%'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await closeDb(tester, db);
   });

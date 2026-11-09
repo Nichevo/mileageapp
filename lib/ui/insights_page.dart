@@ -8,6 +8,7 @@ import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/energy.dart';
+import '../domain/ev_costs.dart';
 import '../domain/stats.dart';
 import 'format.dart';
 
@@ -141,6 +142,7 @@ class _InsightsPageState extends State<InsightsPage> {
                     caption: 'Dashed line is the rolling average; dots are single ${energy.isCharge ? 'charges' : 'tanks'}',
                     child: _economy(stats, cs.primary),
                   ),
+                  if (energy.isCharge) _chargeSplitCard(all),
                   _ChartCard(
                     title: 'Driving by month of year · average km per day',
                     caption: _busiestMonths(byMonth),
@@ -167,6 +169,44 @@ class _InsightsPageState extends State<InsightsPage> {
             },
           );
         },
+      ),
+    );
+  }
+
+  /// Home vs public charging: share of kWh and price paid at each.
+  Widget _chargeSplitCard(List<EnergyEvent> charges) {
+    final split = chargeSplit([for (final c in charges) (place: c.chargerType, kwh: c.quantity, cost: c.cost)]);
+    final totalKwh = split.fold(0.0, (a, s) => a + s.kwh);
+    if (totalKwh <= 0) return const SizedBox.shrink();
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final colors = {'home': cs.primary, 'ac': cs.tertiary, 'dc': cs.error};
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('WHERE YOU CHARGE', style: t.labelSmall),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Row(children: [
+              for (final s in split)
+                Expanded(flex: (s.kwh / totalKwh * 1000).round().clamp(1, 1000), child: Container(height: 14, color: colors[s.place])),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          for (final s in split)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Container(width: 10, height: 10, color: colors[s.place]),
+                const SizedBox(width: 8),
+                Expanded(child: Text('${chargePlaceLabel(s.place)} ${(s.kwh / totalKwh * 100).round()}% · ${s.count} charge${s.count == 1 ? '' : 's'}')),
+                Text(s.pricePerKwh == null ? '' : '\$${s.pricePerKwh!.toStringAsFixed(2)}/kWh', style: t.titleSmall),
+              ]),
+            ),
+        ]),
       ),
     );
   }

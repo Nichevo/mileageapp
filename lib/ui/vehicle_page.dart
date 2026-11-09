@@ -8,6 +8,7 @@ import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/carjam.dart';
 import '../domain/energy.dart';
+import '../domain/ev_costs.dart';
 import '../vehicle/carjam_client.dart';
 import 'format.dart';
 
@@ -28,6 +29,7 @@ class _VehiclePageState extends State<VehiclePage> {
   final _model = TextEditingController();
   final _year = TextEditingController();
   final _tank = TextEditingController();
+  final _ruc = TextEditingController();
   final _rated = TextEditingController();
   final _notes = TextEditingController();
   Vehicle? _v;
@@ -62,6 +64,8 @@ class _VehiclePageState extends State<VehiclePage> {
       _model.text = v.model ?? '';
       _year.text = v.year?.toString() ?? '';
       _tank.text = v.tankSize?.toString() ?? '';
+      final ruc = scope.settings.rucUntilKm(v.id);
+      _ruc.text = ruc == null ? '' : ruc.round().toString();
       _rated.text = v.ratedEconomy?.toString() ?? '';
       _notes.text = v.notes ?? '';
     });
@@ -72,6 +76,7 @@ class _VehiclePageState extends State<VehiclePage> {
     final name = _name.text.trim().isEmpty ? 'My car' : _name.text.trim();
     _v ??= await scope.repo.addVehicle(name, _kind);
     await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
+    await scope.settings.setRucUntilKm(_v!.id, paysRuc(_kind) ? double.tryParse(_ruc.text.replaceAll(',', '')) : null);
     await scope.repo.saveVehicle(VehiclesCompanion(
       id: Value(_v!.id),
       name: Value(name),
@@ -244,6 +249,18 @@ class _VehiclePageState extends State<VehiclePage> {
                   const SizedBox(width: 12),
                   Expanded(child: TextField(controller: _tank, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _kind == 'ev' ? 'Battery (kWh)' : 'Tank size (L)', border: const OutlineInputBorder()))),
                 ]),
+                if (paysRuc(_kind)) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _ruc,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Road user charges paid up to (km)',
+                      helperText: 'From your RUC licence, for a reminder before it runs out',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextField(controller: _rated, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Rated economy (${Energy.primaryFor(_kind).per100})', helperText: 'The maker\'s figure, shown as a benchmark', border: const OutlineInputBorder())),
                 const SizedBox(height: 12),
@@ -290,7 +307,7 @@ class _VehiclePageState extends State<VehiclePage> {
 
   @override
   void dispose() {
-    for (final c in [_plate, _name, _make, _model, _year, _tank, _rated, _notes]) {
+    for (final c in [_plate, _name, _make, _model, _year, _tank, _ruc, _rated, _notes]) {
       c.dispose();
     }
     super.dispose();

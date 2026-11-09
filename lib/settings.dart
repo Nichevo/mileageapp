@@ -54,6 +54,11 @@ class Settings {
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
 
   /// The car's number plate, per vehicle. Kept on the phone only.
+  /// Odometer reading the road user charges licence runs to.
+  double? rucUntilKm(String vehicleId) => _p.getDouble('ruc_$vehicleId');
+  Future<void> setRucUntilKm(String vehicleId, double? km) async =>
+      km == null ? await _p.remove('ruc_$vehicleId') : await _p.setDouble('ruc_$vehicleId', km);
+
   String? plateFor(String vehicleId) => _p.getString('plate_$vehicleId');
   Future<void> setPlate(String vehicleId, String? plate) async =>
       plate == null || plate.isEmpty ? await _p.remove('plate_$vehicleId') : await _p.setString('plate_$vehicleId', plate);

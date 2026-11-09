@@ -14,6 +14,7 @@ import 'format.dart';
 import 'care_page.dart';
 import 'import_page.dart';
 import 'reminder_settings_page.dart';
+import 'ev_compare_page.dart';
 import 'prices_page.dart';
 import 'sharetank_page.dart';
 import 'vehicle_page.dart';
@@ -169,6 +170,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Fuel prices'),
             subtitle: const Text('National average, your stations, Gaspy'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PricesPage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.electric_car_outlined),
+            title: const Text('Would an EV pay off?'),
+            subtitle: const Text('Your last year of driving, costed as an EV'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EvComparePage())),
           ),
           ListTile(
             leading: const Icon(Icons.savings_outlined),

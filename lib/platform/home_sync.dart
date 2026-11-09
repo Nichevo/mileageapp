@@ -10,6 +10,7 @@ import 'package:drift/drift.dart' hide Column;
 import '../data/repository.dart';
 import '../domain/care.dart';
 import '../domain/energy.dart';
+import '../domain/ev_costs.dart';
 import '../domain/reminders.dart';
 import '../trips/road_lookup.dart';
 import '../domain/stats.dart';
@@ -71,6 +72,18 @@ class HomeSync {
         dueOn: d.expectedAt!,
         longLead: i.kind == 'wof' || i.kind == 'rego',
       ));
+    }
+    final rucKm = settings.rucUntilKm(vid);
+    if (rucKm != null && paysRuc(vehicle?.kind ?? 'petrol')) {
+      final due = rucDueOn(rucUntilKm: rucKm, currentKm: odo, kmPerDay: perDay, now: n);
+      if (due != null) {
+        sources.add(ReminderSource(
+          id: 'ruc-$vid-${rucKm.round()}',
+          title: 'Road user charges due',
+          body: 'Your RUC licence runs to ${fmtKm(rucKm)} km${odo == null ? '' : ', about ${fmtKm(rucKm - odo)} km to go'}.',
+          dueOn: due,
+        ));
+      }
     }
     final policy = policies.firstOrNull;
     if (policy?.renewAt != null) {
