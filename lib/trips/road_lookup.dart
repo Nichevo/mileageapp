@@ -62,7 +62,9 @@ class RoadLookup {
     if (queryLines(samples).isEmpty) return null;
     final osm = await fetch(samples, client: client);
     final road = matchRoads(samples, osm);
-    final stats = trip.statsJson == null ? computeTripStats(samples).toJson() : (jsonDecode(trip.statsJson!) as Map<String, Object?>);
+    // Re-read: the weather lookup may have saved in the meantime.
+    final fresh = await repo.trip(tripId);
+    final stats = fresh?.statsJson == null ? computeTripStats(samples).toJson() : (jsonDecode(fresh!.statsJson!) as Map<String, Object?>);
     stats['road'] = road.toJson();
     await repo.setTripStatsJson(tripId, jsonEncode(stats));
     return road;

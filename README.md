@@ -37,6 +37,10 @@ Bluetooth auto-start uses a manifest receiver for the car's connect and disconne
 
 Road types and traffic lights (`lib/domain/road_match.dart`, `lib/trips/road_lookup.dart`): after a trip, a simplified route, minus the first and last 300 m, is sent to the public Overpass API to fetch traffic signal nodes and drivable roads nearby. The track is matched to the nearest road heading the same way (within 25 m) to split the distance into motorway, highway/main, suburban and local roads, and stops within 50 m of a signalised intersection are counted as waits at lights. It can be switched off under Trips > car settings.
 
+Weather and elevation (`lib/domain/trip_weather.dart`, `lib/trips/weather_lookup.dart`): after a trip, the free Open-Meteo API is asked for the hourly weather near the middle of the route (location rounded to about 1 km) and for ground heights at points every 200 m along it (minus the first and last 300 m). The trip page shows temperature, rain and wind relative to the direction of travel, plus climb, descent and an elevation chart by distance. It has its own switch under Trips > car settings.
+
+Places (`lib/domain/places.dart`): when three or more trips start or end within about 150 m of each other, the Trips page offers to name the spot (Home, Work or any name). Trips that still have their automatic name are then titled "Home → Work" and can be filtered by place. Places are kept in the app's settings on the phone only.
+
 ## Privacy rules for this repository
 
 This repo holds code, documentation and fictional sample data only.

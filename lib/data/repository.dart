@@ -318,6 +318,27 @@ class Repository {
         await (db.delete(db.trips)..where((t) => t.id.equals(id))).go();
       });
 
+  /// First and last GPS point of every recorded trip of a vehicle.
+  Future<Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})>> allTripEnds(String vehicleId) async {
+    final rows = await db.customSelect(
+      'SELECT p.trip_id AS id, MIN(p.seq) AS first, MAX(p.seq) AS last FROM trip_points p '
+      'JOIN trips t ON t.id = p.trip_id WHERE t.vehicle_id = ? GROUP BY p.trip_id',
+      variables: [Variable.withString(vehicleId)],
+      readsFrom: {db.tripPoints, db.trips},
+    ).get();
+    if (rows.isEmpty) return {};
+    final seqs = [for (final r in rows) ...[r.read<int>('first'), r.read<int>('last')]];
+    final pts = {for (final p in await (db.select(db.tripPoints)..where((p) => p.seq.isIn(seqs))).get()) p.seq: p};
+    return {
+      for (final r in rows)
+        if (pts[r.read<int>('first')] != null && pts[r.read<int>('last')] != null)
+          r.read<String>('id'): (
+            from: (lat: pts[r.read<int>('first')]!.lat, lon: pts[r.read<int>('first')]!.lon),
+            to: (lat: pts[r.read<int>('last')]!.lat, lon: pts[r.read<int>('last')]!.lon),
+          ),
+    };
+  }
+
   /// First and last GPS point of a trip, for spotting trips that continue
   /// one another.
   Future<({({double lat, double lon}) from, ({double lat, double lon}) to})?> tripEnds(String tripId) async {

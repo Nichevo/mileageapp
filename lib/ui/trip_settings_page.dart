@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import 'places_page.dart';
 import '../trips/recorder.dart';
 
 /// Walks through what Android needs for trips to start by themselves when
@@ -162,6 +163,26 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
                   value: AppScope.of(context).settings.roadLookup,
                   onChanged: (v) async {
                     await AppScope.of(context).settings.setRoadLookup(v);
+                    setState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Weather and elevation'),
+                  subtitle: const Text(
+                      'After a trip, look up the weather at the time and the ground height along the route from the free Open-Meteo service. '
+                      'The weather lookup sends a location rounded to about 1 km; the elevation lookup sends points along the route, leaving off the first and last 300 m.'),
+                  value: AppScope.of(context).settings.weatherLookup,
+                  onChanged: (v) async {
+                    await AppScope.of(context).settings.setWeatherLookup(v);
+                    setState(() {});
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.place_outlined),
+                  title: const Text('Places'),
+                  subtitle: Text('${AppScope.of(context).settings.places.length} named, such as Home and Work'),
+                  onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PlacesPage()));
                     setState(() {});
                   },
                 ),

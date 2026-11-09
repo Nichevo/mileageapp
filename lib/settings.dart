@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+
+import 'domain/places.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Small key/value settings. Stored in SharedPreferences, which Android backs
@@ -54,6 +56,16 @@ class Settings {
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
 
   /// The car's number plate, per vehicle. Kept on the phone only.
+  /// Named places (Home, Work…), as JSON. Phone only.
+  List<Place> get places => Place.listFromJson(_p.getString('places'));
+  Future<void> setPlaces(List<Place> p) => _p.setString('places', Place.listToJson(p));
+  List<String> get dismissedPlaces => _p.getStringList('dismissedPlaces') ?? const [];
+  Future<void> dismissPlace(String key) => _p.setStringList('dismissedPlaces', [...dismissedPlaces, key]);
+
+  /// Look up weather and ground elevation for finished trips (Open-Meteo).
+  bool get weatherLookup => _p.getBool('weatherLookup') ?? true;
+  Future<void> setWeatherLookup(bool v) => _p.setBool('weatherLookup', v);
+
   /// Merge suggestions the user said no to ("earlierId+laterId").
   List<String> get dismissedMerges => _p.getStringList('dismissedMerges') ?? const [];
   Future<void> dismissMerge(String key) => _p.setStringList('dismissedMerges', [...dismissedMerges, key]);

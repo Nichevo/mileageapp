@@ -10,10 +10,14 @@ import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/reminders.dart' show tollPayBy, tollPayDays;
 import '../domain/road_match.dart';
+import '../domain/places.dart';
 import '../domain/trip_profile.dart';
+import '../domain/trip_weather.dart';
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
+import '../trips/recorder.dart' show TripRecorder;
 import '../trips/road_lookup.dart';
+import '../trips/weather_lookup.dart';
 import 'format.dart';
 import 'toll_form.dart';
 import 'trip_format.dart';
@@ -35,6 +39,28 @@ class _TripDetailPageState extends State<TripDetailPage> {
   ({double per100, double price})? _fuel;
   bool _roadBusy = false, _roadTried = false;
   String? _roadError;
+  bool _wxBusy = false, _wxTried = false;
+  String? _wxError;
+
+  Future<void> _lookupWeather() async {
+    final repo = AppScope.of(context).repo;
+    setState(() {
+      _wxBusy = true;
+      _wxTried = true;
+      _wxError = null;
+    });
+    String? error;
+    try {
+      await WeatherLookup.analyse(repo, widget.tripId);
+    } catch (_) {
+      error = 'Couldn\'t reach the weather service. Check the connection and try again.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _wxBusy = false;
+      _wxError = error;
+    });
+  }
 
   Future<void> _lookupRoads() async {
     final repo = AppScope.of(context).repo;
@@ -137,6 +163,12 @@ class _TripDetailPageState extends State<TripDetailPage> {
       builder: (context, snap) {
         final trip = snap.data;
         final road = RoadLookup.stored(trip?.statsJson);
+        _statsJson = trip?.statsJson == null ? const {} : (jsonDecode(trip!.statsJson!) as Map<String, Object?>);
+        if (trip != null && trip.status == 'done' && !_statsJson.containsKey('weather') && !_wxTried && _stats != null && scope.settings.weatherLookup) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_wxTried) _lookupWeather();
+          });
+        }
         if (trip != null && road == null && !_roadTried && _stats != null && scope.settings.roadLookup) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_roadTried) _lookupRoads();
@@ -144,7 +176,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
         }
         return Scaffold(
           appBar: AppBar(
-            title: Text(trip?.name ?? 'Trip'),
+            title: Text(trip == null ? 'Trip' : _title(trip)),
             actions: [
               if (trip != null) IconButton(tooltip: 'Edit', icon: const Icon(Icons.edit_outlined), onPressed: () => _rename(trip)),
               IconButton(tooltip: 'Delete', icon: const Icon(Icons.delete_outline), onPressed: _delete),
@@ -180,6 +212,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
                           if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
+                          if (_stats != null && trip.status == 'done') _weatherSection(context, trip),
                           if (_stats != null) ..._chartsSection(context),
                           if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
                           const SizedBox(height: 20),
@@ -194,6 +227,68 @@ class _TripDetailPageState extends State<TripDetailPage> {
     );
   }
 
+  Map<String, Object?> _statsJson = const {};
+
+  /// Weather at the time and ground elevation, or a button to look them up.
+  Widget _weatherSection(BuildContext context, Trip trip) {
+    final t = Theme.of(context).textTheme;
+    final looked = _statsJson.containsKey('weather');
+    final w = TripWeather.fromJson(_statsJson['weather']);
+    final e = TripElevation.fromJson(_statsJson['elev']);
+    final samples = [for (final p in _accurate) GpsSample(p.at, p.lat, p.lon)];
+    if (!looked) {
+      if (_wxBusy) return const Padding(padding: EdgeInsets.only(top: 16), child: LinearProgressIndicator());
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (_wxError != null) Text(_wxError!, style: t.bodySmall),
+          OutlinedButton.icon(
+            onPressed: _lookupWeather,
+            icon: const Icon(Icons.cloud_outlined),
+            label: Text(_wxError == null ? 'Look up weather and elevation' : 'Try again'),
+          ),
+        ]),
+      );
+    }
+    if (w == null && e == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (w != null)
+          Row(children: [
+            Icon(_weatherIcon(w.code), size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(w.describe(headingDeg: overallHeading(samples)), style: t.bodyLarge)),
+          ]),
+        if (e != null) ...[
+          const SizedBox(height: 6),
+          Row(children: [
+            const Icon(Icons.terrain_outlined, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Climb ${e.gainM.round()} m, descent ${e.lossM.round()} m, between ${e.minM.round()} and ${e.maxM.round()} m above sea level',
+                  style: t.bodyLarge),
+            ),
+          ]),
+        ],
+        const SizedBox(height: 4),
+        Text('From Open-Meteo: weather for the hour of the trip near its middle, and ground height along the route.', style: t.bodySmall),
+      ]),
+    );
+  }
+
+  static IconData _weatherIcon(int code) => code >= 95
+      ? Icons.thunderstorm_outlined
+      : (code >= 51 ? Icons.water_drop_outlined : (code >= 45 ? Icons.foggy : (code >= 2 ? Icons.cloud_outlined : Icons.wb_sunny_outlined)));
+
+  /// "Home → Work" for trips that still have their automatic name.
+  String _title(Trip trip) {
+    final pts = _accurate;
+    if (pts.isEmpty || trip.name != TripRecorder.defaultName(trip.startAt)) return trip.name;
+    final places = AppScope.of(context).settings.places;
+    return placeTitle(placeAt((lat: pts.first.lat, lon: pts.first.lon), places), placeAt((lat: pts.last.lat, lon: pts.last.lon), places)) ?? trip.name;
+  }
+
   List<TripPoint> get _accurate => [for (final p in _points ?? const <TripPoint>[]) if ((p.accuracyM ?? 0) <= maxAccuracyM) p];
 
   /// Speed, and elevation when the phone recorded it, through the trip.
@@ -203,7 +298,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     final speed = [for (final p in _profile) if (p.kmh != null) FlSpot(p.minutes, p.kmh!)];
     final alt = [for (final p in _profile) if (p.altitudeM != null) FlSpot(p.minutes, p.altitudeM!)];
     if (speed.length < 3) return const [];
-    Widget chart(String title, List<FlSpot> spots, Color colour, String unit, {bool fromZero = true}) {
+    Widget chart(String title, List<FlSpot> spots, Color colour, String unit, {bool fromZero = true, String xUnit = 'min'}) {
       final ys = spots.map((s) => s.y);
       final lo = fromZero ? 0.0 : ys.reduce(math.min), hi = ys.reduce(math.max);
       final pad = math.max(5.0, (hi - lo) * 0.1);
@@ -229,13 +324,15 @@ class _TripDetailPageState extends State<TripDetailPage> {
                   showTitles: true,
                   reservedSize: 22,
                   interval: _niceMinutes(spots.last.x),
-                  getTitlesWidget: (v, m) => Text('${v.round()} min', style: t.labelSmall),
+                  getTitlesWidget: (v, m) => Text('${v.round()} $xUnit', style: t.labelSmall),
                 ),
               ),
             ),
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
-                getTooltipItems: (items) => [for (final i in items) LineTooltipItem('${i.y.round()} $unit\n${i.x.round()} min', TextStyle(color: cs.onInverseSurface))],
+                getTooltipItems: (items) => [
+                  for (final i in items) LineTooltipItem('${i.y.round()} $unit\n${i.x.toStringAsFixed(xUnit == 'km' ? 1 : 0)} $xUnit', TextStyle(color: cs.onInverseSurface)),
+                ],
               ),
             ),
             lineBarsData: [
@@ -254,9 +351,13 @@ class _TripDetailPageState extends State<TripDetailPage> {
       ]);
     }
 
+    final elev = TripElevation.fromJson(_statsJson['elev']);
     return [
       chart('Speed · km/h', speed, cs.primary, 'km/h'),
-      if (alt.length >= 3) chart('Elevation · m (phone GPS)', alt, cs.tertiary, 'm', fromZero: false),
+      if (elev != null && elev.profile.length >= 3)
+        chart('Elevation · m, by distance', [for (final p in elev.profile) FlSpot(p.km, p.m)], cs.tertiary, 'm', fromZero: false, xUnit: 'km')
+      else if (alt.length >= 3)
+        chart('Elevation · m (phone GPS)', alt, cs.tertiary, 'm', fromZero: false),
     ];
   }
 

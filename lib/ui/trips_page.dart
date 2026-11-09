@@ -6,14 +6,18 @@ import 'package:latlong2/latlong.dart';
 
 import '../app.dart';
 import '../data/database.dart';
+import '../data/repository.dart' show newId;
+import '../domain/places.dart';
 import '../domain/trip_filter.dart';
 import '../domain/trip_stats.dart';
 import '../trips/recorder.dart';
 import '../trips/road_lookup.dart';
+import '../trips/trip_lookups.dart';
 import 'format.dart';
 import 'trip_detail_page.dart';
 import 'trip_format.dart';
 import 'trip_map.dart';
+import 'places_page.dart' show askPlaceName;
 import 'trip_settings_page.dart';
 
 class TripsPage extends StatefulWidget {
@@ -32,6 +36,10 @@ class _TripsPageState extends State<TripsPage> {
   TripPeriod _period = TripPeriod.all;
   TripSize _size = TripSize.any;
   final _selected = <String>{};
+  String? _placeId; // filter: trips starting or ending here
+  /// Start and end of every recorded trip, for place names.
+  Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})> _allEnds = const {};
+  String _endsKey = '';
   /// First and last points of trips that might be merged, loaded on demand.
   final _ends = <String, ({({double lat, double lon}) from, ({double lat, double lon}) to})?>{};
 
@@ -57,7 +65,7 @@ class _TripsPageState extends State<TripsPage> {
     // save it into the database.
     if (id != _currentId || id == null) {
       await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
-      if (scope.settings.roadLookup) RoadLookup.analyseRecent(scope.repo, scope.settings.activeVehicleId!);
+      lookUpRecentTrips(scope.repo, scope.settings);
     }
     final car = _car == null || id != _currentId ? await TripRecorder.car() : _car;
     if (!mounted) return;
@@ -156,7 +164,17 @@ class _TripsPageState extends State<TripsPage> {
           now: DateTime.now(),
         );
         final suggestions = _suggestions(scope, done);
-        final filtered = _period != TripPeriod.all || _size != TripSize.any;
+        _loadEnds(scope, trips);
+        final places = scope.settings.places;
+        if (_placeId != null && places.every((p) => p.id != _placeId)) _placeId = null;
+        if (_placeId != null) {
+          rows.removeWhere((r) {
+            final e = _allEnds[r.id];
+            return e == null || (placeAt(e.from, places)?.id != _placeId && placeAt(e.to, places)?.id != _placeId);
+          });
+        }
+        final newPlace = _placeSuggestion(scope, places);
+        final filtered = _period != TripPeriod.all || _size != TripSize.any || _placeId != null;
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
@@ -171,6 +189,7 @@ class _TripsPageState extends State<TripsPage> {
               if (done.isNotEmpty) _yearSummary(context, done),
               for (final (a, b) in suggestions)
                 if (byId[a] != null && byId[b] != null) _suggestionCard(context, scope, byId[a]!, byId[b]!),
+              if (newPlace != null) _placeCard(context, scope, newPlace),
             ] else
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -178,7 +197,7 @@ class _TripsPageState extends State<TripsPage> {
                     style: Theme.of(context).textTheme.bodySmall),
               ),
             const SizedBox(height: 8),
-            if (trips.isNotEmpty) _filterBar(context),
+            if (trips.isNotEmpty) _filterBar(context, places),
             if (trips.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
@@ -201,7 +220,72 @@ class _TripsPageState extends State<TripsPage> {
     );
   }
 
-  Widget _filterBar(BuildContext context) {
+  /// Loads trip ends again when the set of trips changes.
+  void _loadEnds(AppScope scope, List<Trip> trips) {
+    final key = '${trips.length}:${trips.where((t) => t.status == 'done').map((t) => t.id).join(',').hashCode}';
+    if (key == _endsKey) return;
+    _endsKey = key;
+    scope.repo.allTripEnds(scope.settings.activeVehicleId!).then((e) {
+      if (mounted) setState(() => _allEnds = e);
+    });
+  }
+
+  /// "Home → Work" for trips that still have their automatic name.
+  String _title(Trip t, List<Place> places) {
+    final e = _allEnds[t.id];
+    if (e == null || t.name != TripRecorder.defaultName(t.startAt)) return t.name;
+    return placeTitle(placeAt(e.from, places), placeAt(e.to, places)) ?? t.name;
+  }
+
+  ({LatLon at, int count})? _placeSuggestion(AppScope scope, List<Place> places) {
+    if (_allEnds.isEmpty) return null;
+    final dismissed = scope.settings.dismissedPlaces.toSet();
+    return suggestPlaces([for (final e in _allEnds.values) ...[e.from, e.to]], places)
+        .where((s) => !dismissed.contains(_placeKey(s.at)))
+        .firstOrNull;
+  }
+
+  static String _placeKey(LatLon p) => '${p.lat.toStringAsFixed(3)},${p.lon.toStringAsFixed(3)}';
+
+  Widget _placeCard(BuildContext context, AppScope scope, ({LatLon at, int count}) s) {
+    final t = Theme.of(context).textTheme;
+    final taken = scope.settings.places.map((p) => p.name).toSet();
+    Future<void> name(String? n) async {
+      n ??= await askPlaceName(context);
+      if (n == null || n.trim().isEmpty) return;
+      await scope.settings.setPlaces([...scope.settings.places, Place(newId(), n.trim(), s.at.lat, s.at.lon)]);
+      setState(() {});
+    }
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(height: 140, child: TripMap(route: [LatLng(s.at.lat, s.at.lon)], follow: true)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Name this place?', style: t.titleSmall),
+            Text('${s.count} trips start or end here. Named places give trips titles like "Home → Work", and stay on this phone.', style: t.bodySmall),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final n in ['Home', 'Work'])
+                if (!taken.contains(n)) ActionChip(label: Text(n), onPressed: () => name(n)),
+              ActionChip(label: const Text('Other name…'), onPressed: () => name(null)),
+              TextButton(
+                onPressed: () async {
+                  await scope.settings.dismissPlace(_placeKey(s.at));
+                  setState(() {});
+                },
+                child: const Text('Not now'),
+              ),
+            ]),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _filterBar(BuildContext context, List<Place> places) {
     Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, {bool highlight = false}) =>
         PopupMenuButton<T>(
           initialValue: value,
@@ -217,6 +301,15 @@ class _TripsPageState extends State<TripsPage> {
       menu(Icons.sort, _sort, TripSort.values, tripSortLabel, (v) => _sort = v),
       menu(Icons.date_range, _period, TripPeriod.values, tripPeriodLabel, (v) => _period = v, highlight: _period != TripPeriod.all),
       menu(Icons.straighten, _size, TripSize.values, tripSizeLabel, (v) => _size = v, highlight: _size != TripSize.any),
+      if (places.isNotEmpty)
+        menu<String>(
+          Icons.place_outlined,
+          _placeId ?? '',
+          ['', ...places.map((p) => p.id)],
+          (id) => id.isEmpty ? 'Any place' : places.firstWhere((p) => p.id == id).name,
+          (v) => _placeId = v.isEmpty ? null : v,
+          highlight: _placeId != null,
+        ),
     ]);
   }
 
@@ -288,7 +381,7 @@ class _TripsPageState extends State<TripsPage> {
       return;
     }
     await scope.repo.mergeTrips(ids);
-    if (scope.settings.roadLookup) RoadLookup.analyseRecent(scope.repo, scope.settings.activeVehicleId!);
+    lookUpRecentTrips(scope.repo, scope.settings);
     if (mounted) setState(_selected.clear);
   }
 
@@ -427,7 +520,7 @@ class _TripsPageState extends State<TripsPage> {
                 ? Icons.description_outlined
                 : (trip.startedBy == 'bluetooth' ? Icons.bluetooth : Icons.route)),
       ),
-      title: Text(trip.name),
+      title: Text(_title(trip, AppScope.of(context).settings.places)),
       subtitle: Text(parts.join(' · ')),
       trailing: selecting ? null : const Icon(Icons.chevron_right),
       onLongPress: trip.status == 'done' ? toggle : null,
