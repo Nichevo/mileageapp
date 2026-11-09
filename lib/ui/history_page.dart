@@ -8,6 +8,7 @@ import 'fillup_form.dart';
 import '../domain/energy.dart';
 import 'charge_form.dart';
 import 'format.dart';
+import 'toll_form.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -121,20 +122,34 @@ class _HistoryPageState extends State<HistoryPage> {
       stream: scope.repo.watchExpenses(vid),
       builder: (context, snap) {
         final items = snap.data ?? const <Expense>[];
-        if (items.isEmpty) return const Center(child: Text('No expenses yet. Imported maintenance records appear here.'));
-        return ListView.separated(
+        final add = Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => editTollParking(context, kind: 'parking'),
+              icon: const Icon(Icons.local_parking),
+              label: const Text('Add toll or parking'),
+            ),
+          ),
+        );
+        if (items.isEmpty) {
+          return Column(children: [add, const Expanded(child: Center(child: Text('No expenses yet. Imported maintenance records appear here.')))]);
+        }
+        return Column(children: [add, Expanded(child: ListView.separated(
           itemCount: items.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (context, i) {
             final x = items[i];
             return ListTile(
               leading: Icon(_iconFor(x.kind)),
+              onTap: x.kind == 'toll' || x.kind == 'parking' ? () => editTollParking(context, existing: x) : null,
               title: Text(x.description),
               subtitle: Text('${fmtDate(x.at)}${x.odometerKm == null ? '' : ' · ${fmtKm(x.odometerKm!)} km'}${x.location == null ? '' : ' · ${x.location}'}'),
               trailing: Text(fmtMoney(x.cost), style: const TextStyle(fontWeight: FontWeight.w600)),
             );
           },
-        );
+        ))]);
       },
     );
   }
@@ -145,6 +160,7 @@ class _HistoryPageState extends State<HistoryPage> {
         'wof' => Icons.verified_outlined,
         'tyres' => Icons.tire_repair,
         'service' => Icons.build_outlined,
+        'toll' || 'parking' => tollParkingIcon(kind),
         _ => Icons.receipt_long_outlined,
       };
 }

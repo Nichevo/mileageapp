@@ -35,8 +35,21 @@ const _highwayRegex =
 class OsmWay {
   final RoadClass cls;
   final List<LL> pts;
-  const OsmWay(this.cls, this.pts);
+  /// Name of the toll road when the way is tagged `toll=yes`.
+  final String? toll;
+  const OsmWay(this.cls, this.pts, {this.toll});
 }
+
+/// A toll road driven on a trip.
+class TollUse {
+  final String name;
+  final double km;
+  const TollUse(this.name, this.km);
+}
+
+/// Less than this on a toll way is treated as a GPS mix-up with a road
+/// alongside it.
+const double tollMinKm = 0.4;
 
 /// Traffic signal nodes and roads near a route, keyed by OSM id so results
 /// from several queries can be merged without duplicates.
@@ -57,13 +70,17 @@ class OsmArea {
       if (e['type'] == 'node' && e['lat'] is num && e['lon'] is num) {
         signals[id] = (lat: (e['lat'] as num).toDouble(), lon: (e['lon'] as num).toDouble());
       } else if (e['type'] == 'way') {
-        final cls = roadClassFor(((e['tags'] as Map?)?['highway'] as String?) ?? '');
+        final tags = (e['tags'] as Map?) ?? const {};
+        final cls = roadClassFor((tags['highway'] as String?) ?? '');
         final geom = e['geometry'] as List?;
         if (cls == null || geom == null || geom.length < 2) continue;
+        final toll = tags['toll'] == 'yes' || tags['toll:motorcar'] == 'yes'
+            ? ((tags['official_name'] ?? tags['name'] ?? tags['ref'] ?? 'Toll road') as String)
+            : null;
         ways[id] = OsmWay(cls, [
           for (final g in geom)
             if (g is Map && g['lat'] is num) (lat: (g['lat'] as num).toDouble(), lon: (g['lon'] as num).toDouble()),
-        ]);
+        ], toll: toll);
       }
     }
     return OsmArea(signals, ways);
@@ -83,7 +100,8 @@ class RoadStats {
   final Map<RoadClass, double> roadKm;
   final List<LightPass> lights;
   final Duration waitAtLights;
-  const RoadStats({required this.roadKm, required this.lights, required this.waitAtLights});
+  final List<TollUse> tolls;
+  const RoadStats({required this.roadKm, required this.lights, required this.waitAtLights, this.tolls = const []});
 
   int get lightsPassed => lights.length;
   int get stoppedAtLights => lights.where((l) => l.stopped).length;
@@ -94,6 +112,7 @@ class RoadStats {
           for (final l in lights) [double.parse(l.lat.toStringAsFixed(5)), double.parse(l.lon.toStringAsFixed(5)), l.stopped ? 1 : 0],
         ],
         'waitS': waitAtLights.inSeconds,
+        if (tolls.isNotEmpty) 'tolls': [for (final t in tolls) [t.name, double.parse(t.km.toStringAsFixed(2))]],
       };
 
   static RoadStats fromJson(Map<String, Object?> j) {
@@ -108,6 +127,10 @@ class RoadStats {
           if (l is List && l.length >= 3) LightPass((l[0] as num).toDouble(), (l[1] as num).toDouble(), l[2] == 1),
       ],
       waitAtLights: Duration(seconds: (j['waitS'] as num?)?.toInt() ?? 0),
+      tolls: [
+        for (final t in (j['tolls'] as List? ?? const []))
+          if (t is List && t.length >= 2 && t[0] is String) TollUse(t[0] as String, (t[1] as num).toDouble()),
+      ],
     );
   }
 }
@@ -190,14 +213,15 @@ List<GpsSample> _clean(List<GpsSample> raw) =>
 RoadStats matchRoads(List<GpsSample> raw, OsmArea osm) {
   final pts = _clean(raw);
 
-  final roads = _SegGrid<RoadClass>();
+  final roads = _SegGrid<OsmWay>();
   for (final w in osm.ways.values) {
     for (var i = 1; i < w.pts.length; i++) {
-      roads.add(w.pts[i - 1], w.pts[i], w.cls);
+      roads.add(w.pts[i - 1], w.pts[i], w);
     }
   }
 
   final roadKm = <RoadClass, double>{};
+  final tollKm = <String, double>{};
   final route = _SegGrid<void>();
   for (var i = 1; i < pts.length; i++) {
     final a = pts[i - 1], b = pts[i];
@@ -214,9 +238,9 @@ RoadStats matchRoads(List<GpsSample> raw, OsmArea osm) {
     final mid = (lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2);
     final kx = _mPerDegLon(mid.lat);
     final heading = segKm * 1000 >= 5 ? _bearing180((b.lon - a.lon) * kx, (b.lat - a.lat) * _mPerDegLat) : null;
-    RoadClass? best;
+    OsmWay? best;
     var bestScore = double.infinity;
-    for (final (p, q, cls) in roads.near(mid)) {
+    for (final (p, q, way) in roads.near(mid)) {
       final r = _toSegment(mid, p, q);
       if (r.dist > roadMatchM) continue;
       final ang = heading == null ? 0.0 : _angleDiff(heading, r.bearing);
@@ -224,11 +248,13 @@ RoadStats matchRoads(List<GpsSample> raw, OsmArea osm) {
       final score = r.dist + ang * 0.3;
       if (score < bestScore) {
         bestScore = score;
-        best = cls;
+        best = way;
       }
     }
-    final cls = best ?? RoadClass.other;
+    final cls = best?.cls ?? RoadClass.other;
     roadKm[cls] = (roadKm[cls] ?? 0) + segKm;
+    final toll = best?.toll;
+    if (toll != null) tollKm[toll] = (tollKm[toll] ?? 0) + segKm;
   }
 
   // Group signal nodes into intersections (one per approach is common).
@@ -282,6 +308,10 @@ RoadStats matchRoads(List<GpsSample> raw, OsmArea osm) {
         ),
     ],
     waitAtLights: wait,
+    tolls: [
+      for (final e in tollKm.entries)
+        if (e.value >= tollMinKm) TollUse(e.key, e.value),
+    ],
   );
 }
 

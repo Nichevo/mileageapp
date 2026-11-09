@@ -1253,6 +1253,28 @@ class $EnergyEventsTable extends EnergyEvents
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sharetankLitresMeta = const VerificationMeta(
+    'sharetankLitres',
+  );
+  @override
+  late final GeneratedColumn<double> sharetankLitres = GeneratedColumn<double>(
+    'sharetank_litres',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _listCostMeta = const VerificationMeta(
+    'listCost',
+  );
+  @override
+  late final GeneratedColumn<double> listCost = GeneratedColumn<double>(
+    'list_cost',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _latMeta = const VerificationMeta('lat');
   @override
   late final GeneratedColumn<double> lat = GeneratedColumn<double>(
@@ -1335,6 +1357,8 @@ class $EnergyEventsTable extends EnergyEvents
     batteryPctEnd,
     paymentNote,
     notes,
+    sharetankLitres,
+    listCost,
     lat,
     lon,
     source,
@@ -1477,6 +1501,21 @@ class $EnergyEventsTable extends EnergyEvents
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('sharetank_litres')) {
+      context.handle(
+        _sharetankLitresMeta,
+        sharetankLitres.isAcceptableOrUnknown(
+          data['sharetank_litres']!,
+          _sharetankLitresMeta,
+        ),
+      );
+    }
+    if (data.containsKey('list_cost')) {
+      context.handle(
+        _listCostMeta,
+        listCost.isAcceptableOrUnknown(data['list_cost']!, _listCostMeta),
+      );
+    }
     if (data.containsKey('lat')) {
       context.handle(
         _latMeta,
@@ -1590,6 +1629,14 @@ class $EnergyEventsTable extends EnergyEvents
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      sharetankLitres: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}sharetank_litres'],
+      ),
+      listCost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}list_cost'],
+      ),
       lat: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}lat'],
@@ -1646,6 +1693,14 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
   final double? batteryPctEnd;
   final String? paymentNote;
   final String? notes;
+
+  /// v4: litres drawn from Z Sharetank (fuel bought earlier at a locked
+  /// price). `cost` is then what the fuel really cost: those litres at the
+  /// price paid for them, plus anything paid at the pump.
+  final double? sharetankLitres;
+
+  /// v4: what the fill would have cost at the pump price, when known.
+  final double? listCost;
   final double? lat;
   final double? lon;
 
@@ -1672,6 +1727,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
     this.batteryPctEnd,
     this.paymentNote,
     this.notes,
+    this.sharetankLitres,
+    this.listCost,
     this.lat,
     this.lon,
     required this.source,
@@ -1716,6 +1773,12 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || sharetankLitres != null) {
+      map['sharetank_litres'] = Variable<double>(sharetankLitres);
+    }
+    if (!nullToAbsent || listCost != null) {
+      map['list_cost'] = Variable<double>(listCost);
     }
     if (!nullToAbsent || lat != null) {
       map['lat'] = Variable<double>(lat);
@@ -1769,6 +1832,12 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      sharetankLitres: sharetankLitres == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sharetankLitres),
+      listCost: listCost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(listCost),
       lat: lat == null && nullToAbsent ? const Value.absent() : Value(lat),
       lon: lon == null && nullToAbsent ? const Value.absent() : Value(lon),
       source: Value(source),
@@ -1803,6 +1872,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
       batteryPctEnd: serializer.fromJson<double?>(json['batteryPctEnd']),
       paymentNote: serializer.fromJson<String?>(json['paymentNote']),
       notes: serializer.fromJson<String?>(json['notes']),
+      sharetankLitres: serializer.fromJson<double?>(json['sharetankLitres']),
+      listCost: serializer.fromJson<double?>(json['listCost']),
       lat: serializer.fromJson<double?>(json['lat']),
       lon: serializer.fromJson<double?>(json['lon']),
       source: serializer.fromJson<String>(json['source']),
@@ -1832,6 +1903,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
       'batteryPctEnd': serializer.toJson<double?>(batteryPctEnd),
       'paymentNote': serializer.toJson<String?>(paymentNote),
       'notes': serializer.toJson<String?>(notes),
+      'sharetankLitres': serializer.toJson<double?>(sharetankLitres),
+      'listCost': serializer.toJson<double?>(listCost),
       'lat': serializer.toJson<double?>(lat),
       'lon': serializer.toJson<double?>(lon),
       'source': serializer.toJson<String>(source),
@@ -1859,6 +1932,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
     Value<double?> batteryPctEnd = const Value.absent(),
     Value<String?> paymentNote = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<double?> sharetankLitres = const Value.absent(),
+    Value<double?> listCost = const Value.absent(),
     Value<double?> lat = const Value.absent(),
     Value<double?> lon = const Value.absent(),
     String? source,
@@ -1887,6 +1962,10 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
         : this.batteryPctEnd,
     paymentNote: paymentNote.present ? paymentNote.value : this.paymentNote,
     notes: notes.present ? notes.value : this.notes,
+    sharetankLitres: sharetankLitres.present
+        ? sharetankLitres.value
+        : this.sharetankLitres,
+    listCost: listCost.present ? listCost.value : this.listCost,
     lat: lat.present ? lat.value : this.lat,
     lon: lon.present ? lon.value : this.lon,
     source: source ?? this.source,
@@ -1925,6 +2004,10 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
           ? data.paymentNote.value
           : this.paymentNote,
       notes: data.notes.present ? data.notes.value : this.notes,
+      sharetankLitres: data.sharetankLitres.present
+          ? data.sharetankLitres.value
+          : this.sharetankLitres,
+      listCost: data.listCost.present ? data.listCost.value : this.listCost,
       lat: data.lat.present ? data.lat.value : this.lat,
       lon: data.lon.present ? data.lon.value : this.lon,
       source: data.source.present ? data.source.value : this.source,
@@ -1954,6 +2037,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
           ..write('batteryPctEnd: $batteryPctEnd, ')
           ..write('paymentNote: $paymentNote, ')
           ..write('notes: $notes, ')
+          ..write('sharetankLitres: $sharetankLitres, ')
+          ..write('listCost: $listCost, ')
           ..write('lat: $lat, ')
           ..write('lon: $lon, ')
           ..write('source: $source, ')
@@ -1983,6 +2068,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
     batteryPctEnd,
     paymentNote,
     notes,
+    sharetankLitres,
+    listCost,
     lat,
     lon,
     source,
@@ -2011,6 +2098,8 @@ class EnergyEvent extends DataClass implements Insertable<EnergyEvent> {
           other.batteryPctEnd == this.batteryPctEnd &&
           other.paymentNote == this.paymentNote &&
           other.notes == this.notes &&
+          other.sharetankLitres == this.sharetankLitres &&
+          other.listCost == this.listCost &&
           other.lat == this.lat &&
           other.lon == this.lon &&
           other.source == this.source &&
@@ -2037,6 +2126,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
   final Value<double?> batteryPctEnd;
   final Value<String?> paymentNote;
   final Value<String?> notes;
+  final Value<double?> sharetankLitres;
+  final Value<double?> listCost;
   final Value<double?> lat;
   final Value<double?> lon;
   final Value<String> source;
@@ -2062,6 +2153,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
     this.batteryPctEnd = const Value.absent(),
     this.paymentNote = const Value.absent(),
     this.notes = const Value.absent(),
+    this.sharetankLitres = const Value.absent(),
+    this.listCost = const Value.absent(),
     this.lat = const Value.absent(),
     this.lon = const Value.absent(),
     this.source = const Value.absent(),
@@ -2088,6 +2181,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
     this.batteryPctEnd = const Value.absent(),
     this.paymentNote = const Value.absent(),
     this.notes = const Value.absent(),
+    this.sharetankLitres = const Value.absent(),
+    this.listCost = const Value.absent(),
     this.lat = const Value.absent(),
     this.lon = const Value.absent(),
     this.source = const Value.absent(),
@@ -2119,6 +2214,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
     Expression<double>? batteryPctEnd,
     Expression<String>? paymentNote,
     Expression<String>? notes,
+    Expression<double>? sharetankLitres,
+    Expression<double>? listCost,
     Expression<double>? lat,
     Expression<double>? lon,
     Expression<String>? source,
@@ -2145,6 +2242,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
       if (batteryPctEnd != null) 'battery_pct_end': batteryPctEnd,
       if (paymentNote != null) 'payment_note': paymentNote,
       if (notes != null) 'notes': notes,
+      if (sharetankLitres != null) 'sharetank_litres': sharetankLitres,
+      if (listCost != null) 'list_cost': listCost,
       if (lat != null) 'lat': lat,
       if (lon != null) 'lon': lon,
       if (source != null) 'source': source,
@@ -2173,6 +2272,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
     Value<double?>? batteryPctEnd,
     Value<String?>? paymentNote,
     Value<String?>? notes,
+    Value<double?>? sharetankLitres,
+    Value<double?>? listCost,
     Value<double?>? lat,
     Value<double?>? lon,
     Value<String>? source,
@@ -2199,6 +2300,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
       batteryPctEnd: batteryPctEnd ?? this.batteryPctEnd,
       paymentNote: paymentNote ?? this.paymentNote,
       notes: notes ?? this.notes,
+      sharetankLitres: sharetankLitres ?? this.sharetankLitres,
+      listCost: listCost ?? this.listCost,
       lat: lat ?? this.lat,
       lon: lon ?? this.lon,
       source: source ?? this.source,
@@ -2263,6 +2366,12 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (sharetankLitres.present) {
+      map['sharetank_litres'] = Variable<double>(sharetankLitres.value);
+    }
+    if (listCost.present) {
+      map['list_cost'] = Variable<double>(listCost.value);
+    }
     if (lat.present) {
       map['lat'] = Variable<double>(lat.value);
     }
@@ -2307,6 +2416,8 @@ class EnergyEventsCompanion extends UpdateCompanion<EnergyEvent> {
           ..write('batteryPctEnd: $batteryPctEnd, ')
           ..write('paymentNote: $paymentNote, ')
           ..write('notes: $notes, ')
+          ..write('sharetankLitres: $sharetankLitres, ')
+          ..write('listCost: $listCost, ')
           ..write('lat: $lat, ')
           ..write('lon: $lon, ')
           ..write('source: $source, ')
@@ -2470,6 +2581,15 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _tripIdMeta = const VerificationMeta('tripId');
+  @override
+  late final GeneratedColumn<String> tripId = GeneratedColumn<String>(
+    'trip_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2486,6 +2606,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     source,
     sourceRef,
     serviceItemId,
+    tripId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2598,6 +2719,12 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         ),
       );
     }
+    if (data.containsKey('trip_id')) {
+      context.handle(
+        _tripIdMeta,
+        tripId.isAcceptableOrUnknown(data['trip_id']!, _tripIdMeta),
+      );
+    }
     return context;
   }
 
@@ -2663,6 +2790,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}service_item_id'],
       ),
+      tripId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trip_id'],
+      ),
     );
   }
 
@@ -2691,6 +2822,9 @@ class Expense extends DataClass implements Insertable<Expense> {
 
   /// v3: the service schedule item this record completed, if any.
   final String? serviceItemId;
+
+  /// v4: the trip a toll or parking charge belongs to, if any.
+  final String? tripId;
   const Expense({
     required this.id,
     required this.vehicleId,
@@ -2706,6 +2840,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.source,
     this.sourceRef,
     this.serviceItemId,
+    this.tripId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2737,6 +2872,9 @@ class Expense extends DataClass implements Insertable<Expense> {
     }
     if (!nullToAbsent || serviceItemId != null) {
       map['service_item_id'] = Variable<String>(serviceItemId);
+    }
+    if (!nullToAbsent || tripId != null) {
+      map['trip_id'] = Variable<String>(tripId);
     }
     return map;
   }
@@ -2771,6 +2909,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       serviceItemId: serviceItemId == null && nullToAbsent
           ? const Value.absent()
           : Value(serviceItemId),
+      tripId: tripId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tripId),
     );
   }
 
@@ -2794,6 +2935,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       source: serializer.fromJson<String>(json['source']),
       sourceRef: serializer.fromJson<String?>(json['sourceRef']),
       serviceItemId: serializer.fromJson<String?>(json['serviceItemId']),
+      tripId: serializer.fromJson<String?>(json['tripId']),
     );
   }
   @override
@@ -2814,6 +2956,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       'source': serializer.toJson<String>(source),
       'sourceRef': serializer.toJson<String?>(sourceRef),
       'serviceItemId': serializer.toJson<String?>(serviceItemId),
+      'tripId': serializer.toJson<String?>(tripId),
     };
   }
 
@@ -2832,6 +2975,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     String? source,
     Value<String?> sourceRef = const Value.absent(),
     Value<String?> serviceItemId = const Value.absent(),
+    Value<String?> tripId = const Value.absent(),
   }) => Expense(
     id: id ?? this.id,
     vehicleId: vehicleId ?? this.vehicleId,
@@ -2851,6 +2995,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     serviceItemId: serviceItemId.present
         ? serviceItemId.value
         : this.serviceItemId,
+    tripId: tripId.present ? tripId.value : this.tripId,
   );
   Expense copyWithCompanion(ExpensesCompanion data) {
     return Expense(
@@ -2878,6 +3023,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       serviceItemId: data.serviceItemId.present
           ? data.serviceItemId.value
           : this.serviceItemId,
+      tripId: data.tripId.present ? data.tripId.value : this.tripId,
     );
   }
 
@@ -2897,7 +3043,8 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('reminderKm: $reminderKm, ')
           ..write('source: $source, ')
           ..write('sourceRef: $sourceRef, ')
-          ..write('serviceItemId: $serviceItemId')
+          ..write('serviceItemId: $serviceItemId, ')
+          ..write('tripId: $tripId')
           ..write(')'))
         .toString();
   }
@@ -2918,6 +3065,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     source,
     sourceRef,
     serviceItemId,
+    tripId,
   );
   @override
   bool operator ==(Object other) =>
@@ -2936,7 +3084,8 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.reminderKm == this.reminderKm &&
           other.source == this.source &&
           other.sourceRef == this.sourceRef &&
-          other.serviceItemId == this.serviceItemId);
+          other.serviceItemId == this.serviceItemId &&
+          other.tripId == this.tripId);
 }
 
 class ExpensesCompanion extends UpdateCompanion<Expense> {
@@ -2954,6 +3103,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<String> source;
   final Value<String?> sourceRef;
   final Value<String?> serviceItemId;
+  final Value<String?> tripId;
   final Value<int> rowid;
   const ExpensesCompanion({
     this.id = const Value.absent(),
@@ -2970,6 +3120,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.source = const Value.absent(),
     this.sourceRef = const Value.absent(),
     this.serviceItemId = const Value.absent(),
+    this.tripId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ExpensesCompanion.insert({
@@ -2987,6 +3138,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.source = const Value.absent(),
     this.sourceRef = const Value.absent(),
     this.serviceItemId = const Value.absent(),
+    this.tripId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        vehicleId = Value(vehicleId),
@@ -3009,6 +3161,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<String>? source,
     Expression<String>? sourceRef,
     Expression<String>? serviceItemId,
+    Expression<String>? tripId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3026,6 +3179,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (source != null) 'source': source,
       if (sourceRef != null) 'source_ref': sourceRef,
       if (serviceItemId != null) 'service_item_id': serviceItemId,
+      if (tripId != null) 'trip_id': tripId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3045,6 +3199,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<String>? source,
     Value<String?>? sourceRef,
     Value<String?>? serviceItemId,
+    Value<String?>? tripId,
     Value<int>? rowid,
   }) {
     return ExpensesCompanion(
@@ -3062,6 +3217,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       source: source ?? this.source,
       sourceRef: sourceRef ?? this.sourceRef,
       serviceItemId: serviceItemId ?? this.serviceItemId,
+      tripId: tripId ?? this.tripId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3111,6 +3267,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (serviceItemId.present) {
       map['service_item_id'] = Variable<String>(serviceItemId.value);
     }
+    if (tripId.present) {
+      map['trip_id'] = Variable<String>(tripId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3134,6 +3293,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('source: $source, ')
           ..write('sourceRef: $sourceRef, ')
           ..write('serviceItemId: $serviceItemId, ')
+          ..write('tripId: $tripId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8498,6 +8658,454 @@ class InsurancePoliciesCompanion extends UpdateCompanion<InsurancePolicy> {
   }
 }
 
+class $FuelCreditsTable extends FuelCredits
+    with TableInfo<$FuelCreditsTable, FuelCredit> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FuelCreditsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _atMeta = const VerificationMeta('at');
+  @override
+  late final GeneratedColumn<DateTime> at = GeneratedColumn<DateTime>(
+    'at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fuelTypeMeta = const VerificationMeta(
+    'fuelType',
+  );
+  @override
+  late final GeneratedColumn<String> fuelType = GeneratedColumn<String>(
+    'fuel_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _litresMeta = const VerificationMeta('litres');
+  @override
+  late final GeneratedColumn<double> litres = GeneratedColumn<double>(
+    'litres',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _costMeta = const VerificationMeta('cost');
+  @override
+  late final GeneratedColumn<double> cost = GeneratedColumn<double>(
+    'cost',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    at,
+    fuelType,
+    litres,
+    cost,
+    notes,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fuel_credits';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FuelCredit> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('at')) {
+      context.handle(_atMeta, at.isAcceptableOrUnknown(data['at']!, _atMeta));
+    } else if (isInserting) {
+      context.missing(_atMeta);
+    }
+    if (data.containsKey('fuel_type')) {
+      context.handle(
+        _fuelTypeMeta,
+        fuelType.isAcceptableOrUnknown(data['fuel_type']!, _fuelTypeMeta),
+      );
+    }
+    if (data.containsKey('litres')) {
+      context.handle(
+        _litresMeta,
+        litres.isAcceptableOrUnknown(data['litres']!, _litresMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_litresMeta);
+    }
+    if (data.containsKey('cost')) {
+      context.handle(
+        _costMeta,
+        cost.isAcceptableOrUnknown(data['cost']!, _costMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_costMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FuelCredit map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FuelCredit(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      at: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}at'],
+      )!,
+      fuelType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fuel_type'],
+      ),
+      litres: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}litres'],
+      )!,
+      cost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cost'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FuelCreditsTable createAlias(String alias) {
+    return $FuelCreditsTable(attachedDatabase, alias);
+  }
+}
+
+class FuelCredit extends DataClass implements Insertable<FuelCredit> {
+  final String id;
+  final DateTime at;
+
+  /// '91', '95' or 'diesel'
+  final String? fuelType;
+  final double litres;
+  final double cost;
+  final String? notes;
+  final DateTime createdAt;
+  const FuelCredit({
+    required this.id,
+    required this.at,
+    this.fuelType,
+    required this.litres,
+    required this.cost,
+    this.notes,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['at'] = Variable<DateTime>(at);
+    if (!nullToAbsent || fuelType != null) {
+      map['fuel_type'] = Variable<String>(fuelType);
+    }
+    map['litres'] = Variable<double>(litres);
+    map['cost'] = Variable<double>(cost);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  FuelCreditsCompanion toCompanion(bool nullToAbsent) {
+    return FuelCreditsCompanion(
+      id: Value(id),
+      at: Value(at),
+      fuelType: fuelType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fuelType),
+      litres: Value(litres),
+      cost: Value(cost),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory FuelCredit.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FuelCredit(
+      id: serializer.fromJson<String>(json['id']),
+      at: serializer.fromJson<DateTime>(json['at']),
+      fuelType: serializer.fromJson<String?>(json['fuelType']),
+      litres: serializer.fromJson<double>(json['litres']),
+      cost: serializer.fromJson<double>(json['cost']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'at': serializer.toJson<DateTime>(at),
+      'fuelType': serializer.toJson<String?>(fuelType),
+      'litres': serializer.toJson<double>(litres),
+      'cost': serializer.toJson<double>(cost),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  FuelCredit copyWith({
+    String? id,
+    DateTime? at,
+    Value<String?> fuelType = const Value.absent(),
+    double? litres,
+    double? cost,
+    Value<String?> notes = const Value.absent(),
+    DateTime? createdAt,
+  }) => FuelCredit(
+    id: id ?? this.id,
+    at: at ?? this.at,
+    fuelType: fuelType.present ? fuelType.value : this.fuelType,
+    litres: litres ?? this.litres,
+    cost: cost ?? this.cost,
+    notes: notes.present ? notes.value : this.notes,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  FuelCredit copyWithCompanion(FuelCreditsCompanion data) {
+    return FuelCredit(
+      id: data.id.present ? data.id.value : this.id,
+      at: data.at.present ? data.at.value : this.at,
+      fuelType: data.fuelType.present ? data.fuelType.value : this.fuelType,
+      litres: data.litres.present ? data.litres.value : this.litres,
+      cost: data.cost.present ? data.cost.value : this.cost,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FuelCredit(')
+          ..write('id: $id, ')
+          ..write('at: $at, ')
+          ..write('fuelType: $fuelType, ')
+          ..write('litres: $litres, ')
+          ..write('cost: $cost, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, at, fuelType, litres, cost, notes, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FuelCredit &&
+          other.id == this.id &&
+          other.at == this.at &&
+          other.fuelType == this.fuelType &&
+          other.litres == this.litres &&
+          other.cost == this.cost &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt);
+}
+
+class FuelCreditsCompanion extends UpdateCompanion<FuelCredit> {
+  final Value<String> id;
+  final Value<DateTime> at;
+  final Value<String?> fuelType;
+  final Value<double> litres;
+  final Value<double> cost;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const FuelCreditsCompanion({
+    this.id = const Value.absent(),
+    this.at = const Value.absent(),
+    this.fuelType = const Value.absent(),
+    this.litres = const Value.absent(),
+    this.cost = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FuelCreditsCompanion.insert({
+    required String id,
+    required DateTime at,
+    this.fuelType = const Value.absent(),
+    required double litres,
+    required double cost,
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       at = Value(at),
+       litres = Value(litres),
+       cost = Value(cost);
+  static Insertable<FuelCredit> custom({
+    Expression<String>? id,
+    Expression<DateTime>? at,
+    Expression<String>? fuelType,
+    Expression<double>? litres,
+    Expression<double>? cost,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (at != null) 'at': at,
+      if (fuelType != null) 'fuel_type': fuelType,
+      if (litres != null) 'litres': litres,
+      if (cost != null) 'cost': cost,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FuelCreditsCompanion copyWith({
+    Value<String>? id,
+    Value<DateTime>? at,
+    Value<String?>? fuelType,
+    Value<double>? litres,
+    Value<double>? cost,
+    Value<String?>? notes,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return FuelCreditsCompanion(
+      id: id ?? this.id,
+      at: at ?? this.at,
+      fuelType: fuelType ?? this.fuelType,
+      litres: litres ?? this.litres,
+      cost: cost ?? this.cost,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (at.present) {
+      map['at'] = Variable<DateTime>(at.value);
+    }
+    if (fuelType.present) {
+      map['fuel_type'] = Variable<String>(fuelType.value);
+    }
+    if (litres.present) {
+      map['litres'] = Variable<double>(litres.value);
+    }
+    if (cost.present) {
+      map['cost'] = Variable<double>(cost.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FuelCreditsCompanion(')
+          ..write('id: $id, ')
+          ..write('at: $at, ')
+          ..write('fuelType: $fuelType, ')
+          ..write('litres: $litres, ')
+          ..write('cost: $cost, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -8514,6 +9122,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ServiceItemsTable serviceItems = $ServiceItemsTable(this);
   late final $InsurancePoliciesTable insurancePolicies =
       $InsurancePoliciesTable(this);
+  late final $FuelCreditsTable fuelCredits = $FuelCreditsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8531,6 +9140,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncQueue,
     serviceItems,
     insurancePolicies,
+    fuelCredits,
   ];
 }
 
@@ -9872,6 +10482,8 @@ typedef $$EnergyEventsTableCreateCompanionBuilder =
       Value<double?> batteryPctEnd,
       Value<String?> paymentNote,
       Value<String?> notes,
+      Value<double?> sharetankLitres,
+      Value<double?> listCost,
       Value<double?> lat,
       Value<double?> lon,
       Value<String> source,
@@ -9899,6 +10511,8 @@ typedef $$EnergyEventsTableUpdateCompanionBuilder =
       Value<double?> batteryPctEnd,
       Value<String?> paymentNote,
       Value<String?> notes,
+      Value<double?> sharetankLitres,
+      Value<double?> listCost,
       Value<double?> lat,
       Value<double?> lon,
       Value<String> source,
@@ -10032,6 +10646,16 @@ class $$EnergyEventsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get sharetankLitres => $composableBuilder(
+    column: $table.sharetankLitres,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get listCost => $composableBuilder(
+    column: $table.listCost,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10196,6 +10820,16 @@ class $$EnergyEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get sharetankLitres => $composableBuilder(
+    column: $table.sharetankLitres,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get listCost => $composableBuilder(
+    column: $table.listCost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get lat => $composableBuilder(
     column: $table.lat,
     builder: (column) => ColumnOrderings(column),
@@ -10339,6 +10973,14 @@ class $$EnergyEventsTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<double> get sharetankLitres => $composableBuilder(
+    column: $table.sharetankLitres,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get listCost =>
+      $composableBuilder(column: $table.listCost, builder: (column) => column);
+
   GeneratedColumn<double> get lat =>
       $composableBuilder(column: $table.lat, builder: (column) => column);
 
@@ -10449,6 +11091,8 @@ class $$EnergyEventsTableTableManager
                 Value<double?> batteryPctEnd = const Value.absent(),
                 Value<String?> paymentNote = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<double?> sharetankLitres = const Value.absent(),
+                Value<double?> listCost = const Value.absent(),
                 Value<double?> lat = const Value.absent(),
                 Value<double?> lon = const Value.absent(),
                 Value<String> source = const Value.absent(),
@@ -10474,6 +11118,8 @@ class $$EnergyEventsTableTableManager
                 batteryPctEnd: batteryPctEnd,
                 paymentNote: paymentNote,
                 notes: notes,
+                sharetankLitres: sharetankLitres,
+                listCost: listCost,
                 lat: lat,
                 lon: lon,
                 source: source,
@@ -10501,6 +11147,8 @@ class $$EnergyEventsTableTableManager
                 Value<double?> batteryPctEnd = const Value.absent(),
                 Value<String?> paymentNote = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<double?> sharetankLitres = const Value.absent(),
+                Value<double?> listCost = const Value.absent(),
                 Value<double?> lat = const Value.absent(),
                 Value<double?> lon = const Value.absent(),
                 Value<String> source = const Value.absent(),
@@ -10526,6 +11174,8 @@ class $$EnergyEventsTableTableManager
                 batteryPctEnd: batteryPctEnd,
                 paymentNote: paymentNote,
                 notes: notes,
+                sharetankLitres: sharetankLitres,
+                listCost: listCost,
                 lat: lat,
                 lon: lon,
                 source: source,
@@ -10630,6 +11280,7 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       Value<String> source,
       Value<String?> sourceRef,
       Value<String?> serviceItemId,
+      Value<String?> tripId,
       Value<int> rowid,
     });
 typedef $$ExpensesTableUpdateCompanionBuilder =
@@ -10648,6 +11299,7 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<String> source,
       Value<String?> sourceRef,
       Value<String?> serviceItemId,
+      Value<String?> tripId,
       Value<int> rowid,
     });
 
@@ -10744,6 +11396,11 @@ class $$ExpensesTableFilterComposer
 
   ColumnFilters<String> get serviceItemId => $composableBuilder(
     column: $table.serviceItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tripId => $composableBuilder(
+    column: $table.tripId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10845,6 +11502,11 @@ class $$ExpensesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tripId => $composableBuilder(
+    column: $table.tripId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$VehiclesTableOrderingComposer get vehicleId {
     final $$VehiclesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -10927,6 +11589,9 @@ class $$ExpensesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get tripId =>
+      $composableBuilder(column: $table.tripId, builder: (column) => column);
+
   $$VehiclesTableAnnotationComposer get vehicleId {
     final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -10993,6 +11658,7 @@ class $$ExpensesTableTableManager
                 Value<String> source = const Value.absent(),
                 Value<String?> sourceRef = const Value.absent(),
                 Value<String?> serviceItemId = const Value.absent(),
+                Value<String?> tripId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion(
                 id: id,
@@ -11009,6 +11675,7 @@ class $$ExpensesTableTableManager
                 source: source,
                 sourceRef: sourceRef,
                 serviceItemId: serviceItemId,
+                tripId: tripId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11027,6 +11694,7 @@ class $$ExpensesTableTableManager
                 Value<String> source = const Value.absent(),
                 Value<String?> sourceRef = const Value.absent(),
                 Value<String?> serviceItemId = const Value.absent(),
+                Value<String?> tripId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExpensesCompanion.insert(
                 id: id,
@@ -11043,6 +11711,7 @@ class $$ExpensesTableTableManager
                 source: source,
                 sourceRef: sourceRef,
                 serviceItemId: serviceItemId,
+                tripId: tripId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -14677,6 +15346,244 @@ typedef $$InsurancePoliciesTableProcessedTableManager =
       InsurancePolicy,
       PrefetchHooks Function({bool vehicleId})
     >;
+typedef $$FuelCreditsTableCreateCompanionBuilder =
+    FuelCreditsCompanion Function({
+      required String id,
+      required DateTime at,
+      Value<String?> fuelType,
+      required double litres,
+      required double cost,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$FuelCreditsTableUpdateCompanionBuilder =
+    FuelCreditsCompanion Function({
+      Value<String> id,
+      Value<DateTime> at,
+      Value<String?> fuelType,
+      Value<double> litres,
+      Value<double> cost,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$FuelCreditsTableFilterComposer
+    extends Composer<_$AppDatabase, $FuelCreditsTable> {
+  $$FuelCreditsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fuelType => $composableBuilder(
+    column: $table.fuelType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get litres => $composableBuilder(
+    column: $table.litres,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cost => $composableBuilder(
+    column: $table.cost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FuelCreditsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FuelCreditsTable> {
+  $$FuelCreditsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fuelType => $composableBuilder(
+    column: $table.fuelType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get litres => $composableBuilder(
+    column: $table.litres,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cost => $composableBuilder(
+    column: $table.cost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FuelCreditsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FuelCreditsTable> {
+  $$FuelCreditsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get at =>
+      $composableBuilder(column: $table.at, builder: (column) => column);
+
+  GeneratedColumn<String> get fuelType =>
+      $composableBuilder(column: $table.fuelType, builder: (column) => column);
+
+  GeneratedColumn<double> get litres =>
+      $composableBuilder(column: $table.litres, builder: (column) => column);
+
+  GeneratedColumn<double> get cost =>
+      $composableBuilder(column: $table.cost, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$FuelCreditsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FuelCreditsTable,
+          FuelCredit,
+          $$FuelCreditsTableFilterComposer,
+          $$FuelCreditsTableOrderingComposer,
+          $$FuelCreditsTableAnnotationComposer,
+          $$FuelCreditsTableCreateCompanionBuilder,
+          $$FuelCreditsTableUpdateCompanionBuilder,
+          (
+            FuelCredit,
+            BaseReferences<_$AppDatabase, $FuelCreditsTable, FuelCredit>,
+          ),
+          FuelCredit,
+          PrefetchHooks Function()
+        > {
+  $$FuelCreditsTableTableManager(_$AppDatabase db, $FuelCreditsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FuelCreditsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FuelCreditsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FuelCreditsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<DateTime> at = const Value.absent(),
+                Value<String?> fuelType = const Value.absent(),
+                Value<double> litres = const Value.absent(),
+                Value<double> cost = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FuelCreditsCompanion(
+                id: id,
+                at: at,
+                fuelType: fuelType,
+                litres: litres,
+                cost: cost,
+                notes: notes,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required DateTime at,
+                Value<String?> fuelType = const Value.absent(),
+                required double litres,
+                required double cost,
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FuelCreditsCompanion.insert(
+                id: id,
+                at: at,
+                fuelType: fuelType,
+                litres: litres,
+                cost: cost,
+                notes: notes,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FuelCreditsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FuelCreditsTable,
+      FuelCredit,
+      $$FuelCreditsTableFilterComposer,
+      $$FuelCreditsTableOrderingComposer,
+      $$FuelCreditsTableAnnotationComposer,
+      $$FuelCreditsTableCreateCompanionBuilder,
+      $$FuelCreditsTableUpdateCompanionBuilder,
+      (
+        FuelCredit,
+        BaseReferences<_$AppDatabase, $FuelCreditsTable, FuelCredit>,
+      ),
+      FuelCredit,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -14705,4 +15612,6 @@ class $AppDatabaseManager {
       $$ServiceItemsTableTableManager(_db, _db.serviceItems);
   $$InsurancePoliciesTableTableManager get insurancePolicies =>
       $$InsurancePoliciesTableTableManager(_db, _db.insurancePolicies);
+  $$FuelCreditsTableTableManager get fuelCredits =>
+      $$FuelCreditsTableTableManager(_db, _db.fuelCredits);
 }

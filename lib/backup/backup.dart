@@ -34,6 +34,7 @@ Future<String> exportBackupJson(AppDatabase db) async {
     'tyre_checks': await dump(db.tyreChecks),
     'service_items': await dump(db.serviceItems),
     'insurance_policies': await dump(db.insurancePolicies),
+    'fuel_credits': await dump(db.fuelCredits),
   };
   return const JsonEncoder.withIndent('  ').convert(data);
 }
@@ -77,6 +78,7 @@ Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json) async {
     await load('tyre_checks', db.tyreChecks, TyreCheck.fromJson);
     await load('service_items', db.serviceItems, ServiceItem.fromJson);
     await load('insurance_policies', db.insurancePolicies, InsurancePolicy.fromJson);
+    await load('fuel_credits', db.fuelCredits, FuelCredit.fromJson);
     // Trip points use an autoincrement key, so they can't be merged by id.
     // Restore a trip's points only when the phone has none for that trip.
     final points = (data['trip_points'] as List?) ?? const [];

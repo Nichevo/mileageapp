@@ -54,6 +54,44 @@ List<PlannedReminder> planReminders(List<ReminderSource> sources, {required Date
   return out;
 }
 
+/// NZ toll roads must be paid within this many days of travel (unless a
+/// toll account pays automatically).
+const tollPayDays = 5;
+
+/// Last day to pay a toll for travel on [travelled].
+DateTime tollPayBy(DateTime travelled) => DateTime(travelled.year, travelled.month, travelled.day + tollPayDays);
+
+/// Reminders to pay for toll roads used on trips: one at the next
+/// notification time after the trip, and one the day before the deadline.
+List<PlannedReminder> planTollReminders(
+  List<({String tripId, String road, DateTime at})> unpaid, {
+  required DateTime now,
+  int hour = 9,
+  int minute = 0,
+}) {
+  final out = <PlannedReminder>[];
+  for (final u in unpaid) {
+    final by = tollPayBy(u.at);
+    if (!by.add(const Duration(days: 1)).isAfter(now)) continue;
+    var first = _atHour(u.at, hour, minute);
+    if (!first.isAfter(u.at)) first = first.add(const Duration(days: 1));
+    final last = _atHour(by.subtract(const Duration(days: 1)), hour, minute);
+    final body = '${u.road}, ${_dayName(u.at)} ${u.at.day}/${u.at.month}. Pay by ${_dayName(by)} ${by.day}/${by.month}, or log it in the trip if it\'s paid.';
+    for (final (name, at) in [('a', first), ('b', last)]) {
+      if (at.isAfter(now)) out.add(PlannedReminder('toll-${u.tripId}:$name', at, 'Pay your toll', body));
+    }
+    if (!first.isAfter(now) && !last.isAfter(now)) {
+      // Deadline is today and both reminders have passed: one more now-ish.
+      final soon = now.add(const Duration(minutes: 5));
+      out.add(PlannedReminder('toll-${u.tripId}:c', soon, 'Toll due today', body));
+    }
+  }
+  out.sort((a, b) => a.at.compareTo(b.at));
+  return out;
+}
+
+String _dayName(DateTime d) => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday - 1];
+
 /// The date the tank is expected to get down to [lowKm] of range, given
 /// typical daily driving. Null when tank size or economy isn't known.
 DateTime? fuelLowOn({

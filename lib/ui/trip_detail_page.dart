@@ -6,11 +6,13 @@ import 'package:latlong2/latlong.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../domain/reminders.dart' show tollPayBy, tollPayDays;
 import '../domain/road_match.dart';
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
 import '../trips/road_lookup.dart';
 import 'format.dart';
+import 'toll_form.dart';
 import 'trip_format.dart';
 import 'trip_map.dart';
 import 'trips_page.dart' show BandBar;
@@ -171,6 +173,8 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           const SizedBox(height: 16),
                           if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
                           if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
+                          const SizedBox(height: 20),
+                          _costsSection(context, trip, road),
                         ],
                       ),
                     ),
@@ -278,6 +282,81 @@ class _TripDetailPageState extends State<TripDetailPage> {
       const SizedBox(height: 4),
       Text('From OpenStreetMap. The first and last 300 m aren\'t looked up, so lights right next to the start or end aren\'t counted.', style: t.bodySmall),
     ]);
+  }
+
+  /// Toll roads used, and tolls and parking logged against this trip.
+  Widget _costsSection(BuildContext context, Trip trip, RoadStats? road) {
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final repo = AppScope.of(context).repo;
+    final tolls = road?.tolls ?? const <TollUse>[];
+    final tollNames = tolls.map((x) => x.name).join(', ');
+    return StreamBuilder<List<Expense>>(
+      stream: repo.watchTripExpenses(trip.id),
+      builder: (context, snap) {
+        final items = snap.data ?? const <Expense>[];
+        final tollLogged = items.any((e) => e.kind == 'toll');
+        final total = items.fold(0.0, (a, e) => a + e.cost);
+        final by = tollPayBy(trip.startAt);
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Tolls and parking', style: t.titleSmall),
+          if (tolls.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              color: tollLogged ? null : cs.tertiaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.toll_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Toll road: $tollNames', style: t.titleSmall)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                    tollLogged
+                        ? 'Toll logged for this trip.'
+                        : 'Pay by ${fmtDate(by)} (within $tollPayDays days of travel), unless a toll account pays it for you.',
+                    style: t.bodySmall,
+                  ),
+                  if (!tollLogged)
+                    Wrap(spacing: 8, children: [
+                      TextButton.icon(onPressed: () => openTollPayment(context), icon: const Icon(Icons.open_in_new, size: 18), label: const Text('Pay on NZTA')),
+                      TextButton.icon(
+                        onPressed: () => editTollParking(context, kind: 'toll', tripId: trip.id, at: trip.startAt, place: tollNames),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Log toll paid'),
+                      ),
+                    ]),
+                ]),
+              ),
+            ),
+          for (final e in items)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: Icon(tollParkingIcon(e.kind)),
+              title: Text(e.description),
+              trailing: Text(fmtMoney(e.cost)),
+              onTap: () => editTollParking(context, existing: e),
+            ),
+          if (items.length > 1) Text('Total ${fmtMoney(total)}', style: t.bodySmall),
+          Wrap(spacing: 8, children: [
+            TextButton.icon(
+              onPressed: () => editTollParking(context, kind: 'parking', tripId: trip.id, at: trip.endAt ?? trip.startAt),
+              icon: const Icon(Icons.local_parking, size: 18),
+              label: const Text('Add parking'),
+            ),
+            if (tolls.isEmpty || tollLogged)
+              TextButton.icon(
+                onPressed: () => editTollParking(context, kind: 'toll', tripId: trip.id, at: trip.startAt, place: tollNames.isEmpty ? null : tollNames),
+                icon: const Icon(Icons.toll_outlined, size: 18),
+                label: const Text('Add toll'),
+              ),
+          ]),
+        ]);
+      },
+    );
   }
 
   Widget _reportSection(BuildContext context, Trip trip) {

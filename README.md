@@ -89,3 +89,11 @@ The trip recorder notes the phone's battery % at the start and end of each trip,
 ## Vehicles and charging
 
 Tap the vehicle name at the top of Home to switch vehicles or add one. Each vehicle has a type (petrol, diesel, hybrid, plug-in hybrid or electric) that decides which buttons and units the app shows (`lib/domain/energy.dart`). Charges are energy events of kind `charge`: kWh comes from the charger, or from the battery % before and after when the battery size is set, and home charges are costed from the home power rate kept in settings. Economy is worked out separately for fill-ups (L/100 km) and charges (kWh/100 km); a plug-in hybrid can switch between them in Insights. Charges are not sent to the Google Sheet.
+
+## Z Sharetank
+
+More > Z Sharetank records fuel bought ahead at a locked price. A fill-up paid with "Sharetank" draws on those purchases oldest first (`lib/domain/sharetank.dart`), so its cost is what the litres actually cost; the pump price, if entered, gives the saving. Purchases belong to the person, not a vehicle. Adding or changing a purchase costs earlier Sharetank fill-ups again.
+
+## Tolls and parking
+
+Tolls and parking are expenses of kind `toll` or `parking`, optionally tied to a trip (`Expenses.tripId`). The OpenStreetMap road lookup also notes ways tagged `toll=yes`. When a trip used one and no toll is logged for it, the trip page links to the NZTA payment page and a reminder fires the next morning and the day before the 5-day deadline (off in Reminders for toll account holders).

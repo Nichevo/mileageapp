@@ -14,8 +14,13 @@ const expenseKinds = <String, String>{
   'rego': 'Registration',
   'tyres': 'Tyres',
   'insurance': 'Insurance',
+  'toll': 'Toll',
+  'parking': 'Parking',
   'other': 'Other',
 };
+
+/// Kinds that belong on a service schedule (not insurance, tolls or parking).
+bool isServiceKind(String kind) => !const {'insurance', 'toll', 'parking'}.contains(kind);
 
 IconData kindIcon(String kind) => switch (kind) {
       'wof' => Icons.verified_outlined,
@@ -374,7 +379,7 @@ class _ServiceItemFormState extends State<ServiceItemForm> {
           DropdownButtonFormField<String>(
             initialValue: _kind,
             decoration: const InputDecoration(labelText: 'Type', border: border),
-            items: [for (final e in expenseKinds.entries) if (e.key != 'insurance') DropdownMenuItem(value: e.key, child: Text(e.value))],
+            items: [for (final e in expenseKinds.entries) if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value))],
             onChanged: (v) => setState(() => _kind = v ?? 'service'),
           ),
           const SizedBox(height: 12),
@@ -469,7 +474,7 @@ class _LogServiceFormState extends State<LogServiceForm> {
               DropdownButtonFormField<String>(
                 initialValue: _kind,
                 decoration: const InputDecoration(labelText: 'Type', border: border),
-                items: [for (final e in expenseKinds.entries) if (e.key != 'insurance') DropdownMenuItem(value: e.key, child: Text(e.value))],
+                items: [for (final e in expenseKinds.entries) if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value))],
                 onChanged: (v) => setState(() => _kind = v ?? 'service'),
               ),
               const SizedBox(height: 12),

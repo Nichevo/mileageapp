@@ -97,6 +97,17 @@ class _ReminderSettingsPageState extends State<ReminderSettingsPage> with Widget
             },
           ),
           SwitchListTile(
+            title: const Text('Pay a toll'),
+            subtitle: const Text('After a trip on a toll road, until a toll is logged for it. Turn off if a toll account pays for you.'),
+            value: s.tollReminders && s.remindersEnabled,
+            onChanged: !s.remindersEnabled
+                ? null
+                : (v) async {
+                    await s.setTollReminders(v);
+                    await _changed();
+                  },
+          ),
+          SwitchListTile(
             title: const Text('Fuel getting low'),
             subtitle: Text(_tank == null
                 ? 'Needs the tank size on the Vehicle page'

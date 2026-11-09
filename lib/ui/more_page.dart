@@ -15,6 +15,7 @@ import 'care_page.dart';
 import 'import_page.dart';
 import 'reminder_settings_page.dart';
 import 'prices_page.dart';
+import 'sharetank_page.dart';
 import 'vehicle_page.dart';
 
 class MorePage extends StatefulWidget {
@@ -168,6 +169,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Fuel prices'),
             subtitle: const Text('National average, your stations, Gaspy'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PricesPage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.savings_outlined),
+            title: const Text('Z Sharetank'),
+            subtitle: const Text('Fuel bought ahead: balance and savings'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SharetankPage())),
           ),
           ListTile(
             leading: const Icon(Icons.notifications_outlined),

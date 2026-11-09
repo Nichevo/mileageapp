@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../domain/stats.dart';
 import '../import/roadtrip_csv.dart';
 import '../import/sheet_csv.dart';
+import '../domain/sharetank.dart';
 import 'database.dart';
 
 const _uuid = Uuid();
@@ -115,6 +116,71 @@ class Repository {
       .toList();
 
   // ---- expenses ----------------------------------------------------------
+
+  // ---- Z Sharetank ----
+
+  Stream<List<FuelCredit>> watchFuelCredits() =>
+      (db.select(db.fuelCredits)..orderBy([(c) => OrderingTerm.desc(c.at)])).watch();
+
+  Future<void> upsertFuelCredit(FuelCreditsCompanion c) => db.into(db.fuelCredits).insertOnConflictUpdate(c);
+
+  Future<void> deleteFuelCredit(String id) => (db.delete(db.fuelCredits)..where((c) => c.id.equals(id))).go();
+
+  /// Fill-ups that drew on Sharetank, from every vehicle (it's the
+  /// person's account, not the car's).
+  Stream<List<EnergyEvent>> watchSharetankFills() => (db.select(db.energyEvents)
+        ..where((e) => e.sharetankLitres.isBiggerThanValue(0))
+        ..orderBy([(e) => OrderingTerm.desc(e.at)]))
+      .watch();
+
+  Future<List<EnergyEvent>> _sharetankFills() =>
+      (db.select(db.energyEvents)..where((e) => e.sharetankLitres.isBiggerThanValue(0))).get();
+
+  /// Sharetank purchases and draws for [fuelType] (purchases and fills with
+  /// no fuel type count for every type), leaving out [excludeEventId] so an
+  /// edited fill-up can be costed again.
+  static ShareLedger ledger(List<FuelCredit> credits, List<EnergyEvent> fills, {String? fuelType, String? excludeEventId}) {
+    bool match(String? t) => fuelType == null || t == null || t == fuelType;
+    return ShareLedger.run(
+      [for (final c in credits) if (match(c.fuelType)) ShareLot(c.at, c.litres, c.cost)],
+      [
+        for (final e in fills)
+          if (e.id != excludeEventId && (e.sharetankLitres ?? 0) > 0 && match(e.fuelType)) ShareDraw(e.id, e.at, e.sharetankLitres!),
+      ],
+    );
+  }
+
+  /// Costs Sharetank fill-ups again at their locked prices, after a
+  /// purchase is added, changed or removed. Fills not fully covered by
+  /// purchases, or with litres paid at an unknown pump price, are left alone.
+  Future<int> recostSharetank() async {
+    final credits = await db.select(db.fuelCredits).get();
+    final fills = await _sharetankFills();
+    var n = 0;
+    for (final type in {for (final f in fills) f.fuelType}) {
+      final l = ledger(credits, fills, fuelType: type);
+      for (final f in fills.where((f) => f.fuelType == type)) {
+        final locked = l.drawCost[f.id];
+        if (locked == null || (l.drawShort[f.id] ?? 0) > 0) continue;
+        final rest = f.quantity - f.sharetankLitres!;
+        final pump = f.listCost == null ? null : f.listCost! / f.quantity;
+        if (rest > 0.01 && pump == null) continue;
+        final cost = double.parse(sharetankFillCost(litres: f.quantity, shareLitres: f.sharetankLitres!, shareCost: locked, pumpPrice: pump).toStringAsFixed(2));
+        if ((cost - f.cost).abs() < 0.005) continue;
+        await upsertEvent(f.toCompanion(true).copyWith(cost: Value(cost), updatedAt: Value(DateTime.now())));
+        n++;
+      }
+    }
+    return n;
+  }
+
+  Future<ShareLedger> sharetankLedger({String? fuelType, String? excludeEventId}) async =>
+      ledger(await db.select(db.fuelCredits).get(), await _sharetankFills(), fuelType: fuelType, excludeEventId: excludeEventId);
+
+  // ---- expenses ----
+
+  Stream<List<Expense>> watchTripExpenses(String tripId) =>
+      (db.select(db.expenses)..where((e) => e.tripId.equals(tripId))).watch();
 
   Stream<List<Expense>> watchExpenses(String vehicleId) =>
       (db.select(db.expenses)

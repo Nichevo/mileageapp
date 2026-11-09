@@ -11,6 +11,7 @@ import '../data/repository.dart';
 import '../domain/care.dart';
 import '../domain/energy.dart';
 import '../domain/reminders.dart';
+import '../trips/road_lookup.dart';
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
 import '../settings.dart';
@@ -102,8 +103,26 @@ class HomeSync {
         ));
       }
     }
+    // Toll roads used in the last week with no toll logged for the trip.
+    final unpaid = <({String tripId, String road, DateTime at})>[];
+    if (settings.tollReminders) {
+      final recent = trips.where((t) => t.startAt.isAfter(n.subtract(const Duration(days: tollPayDays + 2)))).toList();
+      if (recent.isNotEmpty) {
+        final paid = (await (db.select(db.expenses)..where((e) => e.kind.equals('toll') & e.tripId.isIn(recent.map((t) => t.id)))).get())
+            .map((e) => e.tripId)
+            .toSet();
+        for (final t in recent) {
+          final tolls = RoadLookup.stored(t.statsJson)?.tolls ?? const [];
+          if (tolls.isEmpty || paid.contains(t.id)) continue;
+          unpaid.add((tripId: t.id, road: tolls.map((x) => x.name).join(', '), at: t.startAt));
+        }
+      }
+    }
     final reminders = settings.remindersEnabled
-        ? planReminders(sources, now: n, hour: settings.reminderHour, minute: settings.reminderMinute)
+        ? ([
+            ...planReminders(sources, now: n, hour: settings.reminderHour, minute: settings.reminderMinute),
+            ...planTollReminders(unpaid, now: n, hour: settings.reminderHour, minute: settings.reminderMinute),
+          ]..sort((a, b) => a.at.compareTo(b.at)))
         : const <PlannedReminder>[];
 
     // ---- widget text ----
@@ -165,6 +184,7 @@ class HomeSyncWatcher {
       repo.watchPolicies(vid),
       repo.watchTyreChecks(vid),
       repo.watchTrips(vid),
+      repo.watchExpenses(vid),
       repo.watchVehicles(),
     ];
     for (final s in streams) {

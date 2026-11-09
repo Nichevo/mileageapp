@@ -26,7 +26,11 @@ void main() {
     await db.close();
 
     db = AppDatabase(NativeDatabase(file, setup: (raw) {
-      if (raw.userVersion == 3) {
+      if (raw.userVersion == 4) {
+        raw.execute('DROP TABLE fuel_credits');
+        raw.execute('ALTER TABLE energy_events DROP COLUMN sharetank_litres');
+        raw.execute('ALTER TABLE energy_events DROP COLUMN list_cost');
+        raw.execute('ALTER TABLE expenses DROP COLUMN trip_id');
         raw.execute('DROP TABLE service_items');
         raw.execute('DROP TABLE insurance_policies');
         raw.execute('ALTER TABLE expenses DROP COLUMN service_item_id');
@@ -47,6 +51,10 @@ void main() {
     // v3 tables exist and work.
     await db.into(db.serviceItems).insert(ServiceItemsCompanion.insert(id: 's1', vehicleId: 'v1', name: 'Oil'));
     expect((await db.select(db.serviceItems).get()).length, 1);
+    // v4 tables and columns exist and work.
+    await db.into(db.fuelCredits).insert(FuelCreditsCompanion.insert(id: 'f1', at: DateTime(2026, 1, 1), litres: 50, cost: 120));
+    expect((await db.select(db.fuelCredits).get()).single.litres, 50);
+    expect((await db.select(db.expenses).get()), isEmpty);
     await db.close();
     await dir.delete(recursive: true);
   });

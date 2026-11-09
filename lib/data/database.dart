@@ -68,6 +68,12 @@ class EnergyEvents extends Table {
   RealColumn get batteryPctEnd => real().nullable()();
   TextColumn get paymentNote => text().nullable()();
   TextColumn get notes => text().nullable()();
+  /// v4: litres drawn from Z Sharetank (fuel bought earlier at a locked
+  /// price). `cost` is then what the fuel really cost: those litres at the
+  /// price paid for them, plus anything paid at the pump.
+  RealColumn get sharetankLitres => real().nullable()();
+  /// v4: what the fill would have cost at the pump price, when known.
+  RealColumn get listCost => real().nullable()();
   RealColumn get lat => real().nullable()();
   RealColumn get lon => real().nullable()();
   /// 'app', 'sheet_import', 'roadtrip_import', 'json_restore'
@@ -97,6 +103,8 @@ class Expenses extends Table {
   TextColumn get sourceRef => text().nullable()();
   /// v3: the service schedule item this record completed, if any.
   TextColumn get serviceItemId => text().nullable()();
+  /// v4: the trip a toll or parking charge belongs to, if any.
+  TextColumn get tripId => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -249,6 +257,22 @@ class SyncQueue extends Table {
   DateTimeColumn get queuedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+/// v4: fuel bought ahead at a locked price (Z Sharetank). Belongs to the
+/// person, not a vehicle; fill-ups draw it down first in, first out.
+@DataClassName('FuelCredit')
+class FuelCredits extends Table {
+  TextColumn get id => text()();
+  DateTimeColumn get at => dateTime()();
+  /// '91', '95' or 'diesel'
+  TextColumn get fuelType => text().nullable()();
+  RealColumn get litres => real()();
+  RealColumn get cost => real()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Vehicles,
   Stations,
@@ -262,13 +286,14 @@ class SyncQueue extends Table {
   SyncQueue,
   ServiceItems,
   InsurancePolicies,
+  FuelCredits,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -286,6 +311,12 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(expenses, expenses.serviceItemId);
             await m.createTable(serviceItems);
             await m.createTable(insurancePolicies);
+          }
+          if (from < 4) {
+            await m.addColumn(energyEvents, energyEvents.sharetankLitres);
+            await m.addColumn(energyEvents, energyEvents.listCost);
+            await m.addColumn(expenses, expenses.tripId);
+            await m.createTable(fuelCredits);
           }
         },
         beforeOpen: (details) async {

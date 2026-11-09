@@ -6,6 +6,7 @@ import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/prices.dart';
+import '../domain/sharetank.dart';
 import '../prices/national_prices.dart';
 import 'format.dart';
 import 'prices_page.dart' show openGaspy, gaspyAvailable;
@@ -30,6 +31,10 @@ class _FillUpFormState extends State<FillUpForm> {
   final _cost = TextEditingController();
   final _notes = TextEditingController();
   final _stationCtl = TextEditingController();
+  final _shareL = TextEditingController();
+  final _pump = TextEditingController();
+  ShareLedger? _ledger;
+  bool _costEdited = false;
   DateTime _at = DateTime.now();
   bool _full = true;
   String? _fuelType;
@@ -55,6 +60,9 @@ class _FillUpFormState extends State<FillUpForm> {
       _full = e.isFull;
       _fuelType = e.fuelType;
       _payment = e.paymentNote;
+      if (e.sharetankLitres != null) _shareL.text = _trim(e.sharetankLitres!);
+      if (e.listCost != null && e.quantity > 0) _pump.text = (e.listCost! / e.quantity).toStringAsFixed(3);
+      _costEdited = true;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
@@ -75,11 +83,54 @@ class _FillUpFormState extends State<FillUpForm> {
         if (_stationCtl.text.isEmpty) _stationCtl.text = scope.settings.lastStation ?? '';
       }
     });
+    await _loadLedger();
     if (widget.existing == null && scope.settings.useGps) _locate();
     try {
       final n = await NationalPriceSource.load();
       if (mounted) setState(() => _national = n);
     } catch (_) {}
+  }
+
+  Future<void> _loadLedger() async {
+    final l = await AppScope.of(context).repo.sharetankLedger(fuelType: _fuelType, excludeEventId: widget.existing?.id);
+    if (!mounted) return;
+    setState(() {
+      _ledger = l;
+      _autoCost();
+    });
+  }
+
+  bool get _isShare => _payment == 'Sharetank';
+  double? get _pumpPrice {
+    final v = double.tryParse(_pump.text.replaceAll(r'$', '').trim());
+    return v != null && v > 0 ? v : null;
+  }
+
+  /// Litres taken from Sharetank: as typed, or the whole fill (up to the
+  /// balance, when purchases have been entered).
+  double get _shareLitres {
+    final typed = double.tryParse(_shareL.text);
+    if (typed != null) return typed;
+    final l = _litresValue ?? 0;
+    final bal = _ledger?.balance ?? 0;
+    return bal > 0 && bal < l ? bal : l;
+  }
+
+  /// Sharetank litres at their locked price, plus the rest at the pump.
+  ({double cost, double short})? get _shareCost {
+    final litres = _litresValue;
+    if (!_isShare || litres == null || litres <= 0) return null;
+    final share = _shareLitres.clamp(0, litres).toDouble();
+    final locked = (_ledger ?? const ShareLedger([], {})).costOf(share);
+    final pump = _pumpPrice;
+    final cost = sharetankFillCost(litres: litres, shareLitres: share - locked.short, shareCost: locked.cost, pumpPrice: pump);
+    return (cost: cost, short: locked.short);
+  }
+
+  void _autoCost() {
+    if (_costEdited) return;
+    final c = _shareCost;
+    if (c != null) _cost.text = c.cost.toStringAsFixed(2);
   }
 
   Future<void> _locate() async {
@@ -151,6 +202,8 @@ class _FillUpFormState extends State<FillUpForm> {
       stationName: Value(stationName.isEmpty ? null : stationName),
       fuelType: Value(_fuelType),
       paymentNote: Value(_payment),
+      sharetankLitres: Value(_isShare ? _shareLitres.clamp(0, _litresValue!).toDouble() : null),
+      listCost: Value(_pumpPrice == null ? null : _pumpPrice! * _litresValue!),
       notes: Value(_notes.text.trim().isEmpty ? null : _notes.text.trim()),
       lat: Value(_fix?.latitude ?? widget.existing?.lat),
       lon: Value(_fix?.longitude ?? widget.existing?.lon),
@@ -241,7 +294,7 @@ class _FillUpFormState extends State<FillUpForm> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Litres', border: OutlineInputBorder()),
                   validator: (v) => (double.tryParse(v ?? '') ?? 0) > 0 ? null : 'Litres',
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setState(_autoCost),
                 ),
               ),
               const SizedBox(width: 12),
@@ -251,7 +304,7 @@ class _FillUpFormState extends State<FillUpForm> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Total \$', border: OutlineInputBorder()),
                   validator: (v) => (double.tryParse((v ?? '').replaceAll(r'$', '')) ?? -1) >= 0 ? null : 'Cost',
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setState(() => _costEdited = true),
                 ),
               ),
             ]),
@@ -306,7 +359,14 @@ class _FillUpFormState extends State<FillUpForm> {
               spacing: 6,
               children: [
                 for (final f in fuelTypes)
-                  ChoiceChip(label: Text(f), selected: _fuelType == f, onSelected: (s) => setState(() => _fuelType = s ? f : null)),
+                  ChoiceChip(
+                    label: Text(f),
+                    selected: _fuelType == f,
+                    onSelected: (s) {
+                      setState(() => _fuelType = s ? f : null);
+                      _loadLedger();
+                    },
+                  ),
               ],
             ),
             const SizedBox(height: 6),
@@ -314,9 +374,18 @@ class _FillUpFormState extends State<FillUpForm> {
               spacing: 6,
               children: [
                 for (final p in paymentTags)
-                  ChoiceChip(label: Text(p), selected: _payment == p, onSelected: (s) => setState(() => _payment = s ? p : null)),
+                  ChoiceChip(
+                    label: Text(p),
+                    selected: _payment == p,
+                    onSelected: (s) => setState(() {
+                      _payment = s ? p : null;
+                      if (_payment == 'Sharetank' && widget.existing == null) _costEdited = false;
+                      _autoCost();
+                    }),
+                  ),
               ],
             ),
+            if (_isShare) ..._sharetankFields(),
             const SizedBox(height: 12),
             TextFormField(
               controller: _notes,
@@ -333,6 +402,52 @@ class _FillUpFormState extends State<FillUpForm> {
         ),
       ),
     );
+  }
+
+  List<Widget> _sharetankFields() {
+    final litres = _litresValue;
+    final c = _shareCost;
+    final pump = _pumpPrice;
+    final l = _ledger;
+    final t = Theme.of(context).textTheme;
+    return [
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+          child: TextField(
+            controller: _shareL,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'From Sharetank (L)',
+              hintText: litres == null ? null : _shareLitres.toStringAsFixed(2),
+              helperText: 'Blank for all of it',
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(_autoCost),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: _pump,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Pump price \$/L', helperText: 'To see what you saved', border: OutlineInputBorder()),
+            onChanged: (_) => setState(_autoCost),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 6),
+      Text(
+        [
+          if (l != null && l.balance > 0) 'Sharetank has ${l.balance.toStringAsFixed(1)} L at ${fmtPrice(l.averagePrice)} on average',
+          if (l == null || l.balance <= 0) 'No Sharetank purchases entered yet: add them in More > Z Sharetank to cost this fill at the locked price',
+          if (c != null && c.short > 0.01 && (l?.balance ?? 0) > 0) '${c.short.toStringAsFixed(1)} L more than the balance${pump == null ? '' : ', costed at the pump price'}',
+          if (c != null && pump != null && litres != null && litres > 0 && c.short < _shareLitres - 0.01)
+            'Saved ${fmtMoney(pump * litres - c.cost)} against the pump',
+        ].join('. '),
+        style: t.bodySmall,
+      ),
+    ];
   }
 
   /// "National average $2.79/L that week · you paid 6c under".
@@ -352,6 +467,8 @@ class _FillUpFormState extends State<FillUpForm> {
     _cost.dispose();
     _notes.dispose();
     _stationCtl.dispose();
+    _shareL.dispose();
+    _pump.dispose();
     super.dispose();
   }
 }

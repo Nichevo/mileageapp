@@ -44,6 +44,11 @@ class Settings {
   bool get fuelReminders => _p.getBool('fuelReminders') ?? true;
   Future<void> setFuelReminders(bool v) => _p.setBool('fuelReminders', v);
 
+  /// Remind to pay after a trip on a toll road. Off when a toll account
+  /// pays automatically.
+  bool get tollReminders => _p.getBool('tollReminders') ?? true;
+  Future<void> setTollReminders(bool v) => _p.setBool('tollReminders', v);
+
   /// Look up traffic lights and road types for finished trips on OpenStreetMap.
   bool get roadLookup => _p.getBool('roadLookup') ?? true;
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
