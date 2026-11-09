@@ -43,6 +43,12 @@ class Repository {
 
   Future<void> saveVehicle(VehiclesCompanion v) => db.into(db.vehicles).insertOnConflictUpdate(v);
 
+  Future<Vehicle> addVehicle(String name, String kind) async {
+    final id = newId();
+    await db.into(db.vehicles).insert(VehiclesCompanion.insert(id: id, name: name, kind: Value(kind)));
+    return (await vehicle(id))!;
+  }
+
   // ---- stations ----------------------------------------------------------
 
   Stream<List<Station>> watchStations() =>
@@ -65,21 +71,21 @@ class Repository {
 
   // ---- fuel / charge events ---------------------------------------------
 
-  Stream<List<EnergyEvent>> watchEvents(String vehicleId, {String kind = 'fuel'}) =>
+  Stream<List<EnergyEvent>> watchEvents(String vehicleId, {String? kind = 'fuel'}) =>
       (db.select(db.energyEvents)
-            ..where((e) => e.vehicleId.equals(vehicleId) & e.kind.equals(kind))
+            ..where((e) => (kind == null ? e.vehicleId.equals(vehicleId) : e.vehicleId.equals(vehicleId) & e.kind.equals(kind)))
             ..orderBy([(e) => OrderingTerm.desc(e.odometerKm)]))
           .watch();
 
-  Future<List<EnergyEvent>> events(String vehicleId, {String kind = 'fuel'}) =>
+  Future<List<EnergyEvent>> events(String vehicleId, {String? kind = 'fuel'}) =>
       (db.select(db.energyEvents)
-            ..where((e) => e.vehicleId.equals(vehicleId) & e.kind.equals(kind))
+            ..where((e) => (kind == null ? e.vehicleId.equals(vehicleId) : e.vehicleId.equals(vehicleId) & e.kind.equals(kind)))
             ..orderBy([(e) => OrderingTerm.asc(e.odometerKm)]))
           .get();
 
-  Future<EnergyEvent?> latestEvent(String vehicleId, {String kind = 'fuel'}) =>
+  Future<EnergyEvent?> latestEvent(String vehicleId, {String? kind = 'fuel'}) =>
       (db.select(db.energyEvents)
-            ..where((e) => e.vehicleId.equals(vehicleId) & e.kind.equals(kind))
+            ..where((e) => (kind == null ? e.vehicleId.equals(vehicleId) : e.vehicleId.equals(vehicleId) & e.kind.equals(kind)))
             ..orderBy([(e) => OrderingTerm.desc(e.odometerKm)])
             ..limit(1))
           .getSingleOrNull();
@@ -94,7 +100,10 @@ class Repository {
     await _enqueue('energy_events', id, action: 'delete');
   }
 
-  static List<FuelRow> toFuelRows(List<EnergyEvent> events) => events
+  /// Fill-ups ([kind] 'fuel') or charges ('charge') as rows for the stats;
+  /// null takes every event, which suits odometer and km-per-day estimates.
+  static List<FuelRow> toFuelRows(List<EnergyEvent> events, {String? kind = 'fuel'}) => events
+      .where((e) => kind == null || e.kind == kind)
       .map((e) => FuelRow(
             at: e.at,
             odometerKm: e.odometerKm,

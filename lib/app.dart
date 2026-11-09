@@ -53,7 +53,10 @@ class MileageApp extends StatelessWidget {
           color: Theme.of(context).colorScheme.surfaceContainer,
           child: SafeArea(top: false, left: false, right: false, child: child ?? const SizedBox()),
         ),
-        home: const Shell(),
+        home: ValueListenableBuilder<String?>(
+          valueListenable: settings.activeVehicle,
+          builder: (context, id, _) => Shell(key: ValueKey(id)),
+        ),
       ),
     );
   }

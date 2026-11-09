@@ -28,7 +28,7 @@ IconData kindIcon(String kind) => switch (kind) {
 
 /// Odometer now (estimated) and typical km per day, from fill-ups.
 ({double? km, double? perDay}) drivingNow(List<EnergyEvent> events) {
-  final rows = Repository.toFuelRows(events);
+  final rows = Repository.toFuelRows(events, kind: null);
   return (km: estimatedOdometer(rows), perDay: recentKmPerDay(rows));
 }
 
@@ -83,7 +83,7 @@ class ServicePage extends StatelessWidget {
     final scope = AppScope.of(context);
     final vid = scope.settings.activeVehicleId!;
     return StreamBuilder<List<EnergyEvent>>(
-      stream: scope.repo.watchEvents(vid),
+      stream: scope.repo.watchEvents(vid, kind: null),
       builder: (context, ev) {
         final driving = drivingNow(ev.data ?? const []);
         return StreamBuilder<List<ServiceItem>>(

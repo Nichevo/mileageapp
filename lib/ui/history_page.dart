@@ -5,6 +5,8 @@ import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/stats.dart';
 import 'fillup_form.dart';
+import '../domain/energy.dart';
+import 'charge_form.dart';
 import 'format.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -29,7 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
             child: SegmentedButton<int>(
               segments: const [
-                ButtonSegment(value: 0, label: Text('Fill-ups')),
+                ButtonSegment(value: 0, label: Text('Fuel & charging')),
                 ButtonSegment(value: 1, label: Text('Expenses')),
               ],
               selected: {_tab},
@@ -44,12 +46,15 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _fills(AppScope scope, String vid) {
     return StreamBuilder<List<EnergyEvent>>(
-      stream: scope.repo.watchEvents(vid),
+      stream: scope.repo.watchEvents(vid, kind: null),
       builder: (context, snap) {
         final events = snap.data ?? const <EnergyEvent>[];
-        if (events.isEmpty) return const Center(child: Text('No fill-ups yet'));
-        final stats = tankStats(Repository.toFuelRows(events));
-        final byId = {for (final s in stats) s.fill.odometerKm: s};
+        if (events.isEmpty) return const Center(child: Text('Nothing logged yet'));
+        // Economy is worked out separately for fill-ups and charges.
+        final byId = {
+          for (final kind in ['fuel', 'charge'])
+            for (final s in tankStats(Repository.toFuelRows(events, kind: kind))) (kind, s.fill.odometerKm): s,
+        };
         final years = events.map((e) => e.at.year).toSet().toList()..sort((a, b) => b.compareTo(a));
         final shown = _year == null ? events : events.where((e) => e.at.year == _year).toList();
         return Column(
@@ -78,22 +83,29 @@ class _HistoryPageState extends State<HistoryPage> {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final e = shown[i];
-                  final s = byId[e.odometerKm];
-                  final tags = [if (e.stationName != null) e.stationName!, if (e.paymentNote != null) e.paymentNote!, if (!e.isFull) 'partial'];
+                  final s = byId[(e.kind, e.odometerKm)];
+                  final energy = e.kind == 'charge' ? Energy.charge : Energy.fuel;
+                  final tags = [
+                    if (energy.isCharge) chargePlaceLabel(e.chargerType),
+                    if (e.stationName != null) e.stationName!,
+                    if (e.paymentNote != null) e.paymentNote!,
+                    if (!e.isFull) 'partial',
+                  ];
                   return ListTile(
+                    leading: energy.isCharge ? const Icon(Icons.ev_station) : null,
                     title: Text('${fmtDate(e.at)}${tags.isEmpty ? '' : ' · ${tags.join(' · ')}'}'),
                     subtitle: Text(
-                      '${fmtKm(e.odometerKm)} km${s?.distanceKm == null ? '' : ' · ${fmtKm(s!.distanceKm!)} km'} · ${fmtL(e.quantity)} · ${fmtMoney(e.cost)} · ${fmtPrice(s?.pricePerUnit)}',
+                      '${fmtKm(e.odometerKm)} km${s?.distanceKm == null ? '' : ' · ${fmtKm(s!.distanceKm!)} km'} · ${energy.quantity(e.quantity)} · ${fmtMoney(e.cost)} · ${energy.price(s?.pricePerUnit)}',
                     ),
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(fmtPer100(s?.litresPer100), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                        Text('L/100', style: Theme.of(context).textTheme.labelSmall),
+                        Text('${energy.unit}/100', style: Theme.of(context).textTheme.labelSmall),
                       ],
                     ),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FillUpForm(existing: e))),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => energy.isCharge ? ChargeForm(existing: e) : FillUpForm(existing: e))),
                   );
                 },
               ),

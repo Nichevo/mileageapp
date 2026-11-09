@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../domain/energy.dart';
 import '../domain/stats.dart';
 import 'format.dart';
 
@@ -20,6 +21,7 @@ class _InsightsPageState extends State<InsightsPage> {
   int _rangeMonths = 12; // 0 = all
   Period _period = Period.month;
   bool _full = false; // show unusually big periods at full height
+  String? _energyKind; // plug-in hybrids can switch between fuel and charging
 
   @override
   Widget build(BuildContext context) {
@@ -27,114 +29,160 @@ class _InsightsPageState extends State<InsightsPage> {
     final vid = scope.settings.activeVehicleId!;
     return Scaffold(
       appBar: AppBar(title: const Text('Insights')),
-      body: StreamBuilder<List<EnergyEvent>>(
-        stream: scope.repo.watchEvents(vid),
-        builder: (context, snap) {
-          final all = snap.data ?? const <EnergyEvent>[];
-          final now = DateTime.now();
-          final cutoff = _rangeMonths == 0 ? null : DateTime(now.year, now.month - _rangeMonths + 1, 1);
-          final allRows = Repository.toFuelRows(all);
-          final rows = cutoff == null ? allRows : allRows.where((r) => !r.at.isBefore(cutoff)).toList();
-          final stats = tankStats(rows);
-          final cs = Theme.of(context).colorScheme;
-          if (all.length < 2) {
-            return const Center(child: Text('Charts appear after a couple of fill-ups'));
-          }
-          // Spreading uses every fill, so the first period in range is complete.
-          final periods = periodTotals(allRows, _period, from: cutoff);
-          final totalKm = periods.fold<double>(0, (a, t) => a + t.km);
-          final totalCost = periods.fold<double>(0, (a, t) => a + t.cost);
-          final byMonth = _kmPerDayByMonth(rows);
-          final byDow = _fillsByWeekday(rows);
-          final unit = switch (_period) { Period.week => 'week', Period.month => 'month', Period.year => 'year' };
-          List<_Bar> series(double? Function(PeriodTotals) f) => [
-                for (var i = 0; i < periods.length; i++)
-                  _Bar(_axisLabel(periods, i), _fullLabel(periods[i].start), f(periods[i]) ?? 0),
+      body: StreamBuilder<List<Vehicle>>(
+        stream: scope.repo.watchVehicles(),
+        builder: (context, vs) {
+          final kind = vs.data?.where((v) => v.id == vid).firstOrNull?.kind ?? 'petrol';
+          final energy = _energyKind == 'charge'
+              ? Energy.charge
+              : _energyKind == 'fuel'
+              ? Energy.fuel
+              : Energy.primaryFor(kind);
+          final both = usesFuel(kind) && usesCharging(kind);
+          return StreamBuilder<List<EnergyEvent>>(
+            stream: scope.repo.watchEvents(vid, kind: null),
+            builder: (context, snap) {
+              final all = (snap.data ?? const <EnergyEvent>[]).where((e) => e.kind == energy.eventKind).toList();
+              final now = DateTime.now();
+              final cutoff = _rangeMonths == 0 ? null : DateTime(now.year, now.month - _rangeMonths + 1, 1);
+              final allRows = Repository.toFuelRows(all, kind: energy.eventKind);
+              final rows = cutoff == null ? allRows : allRows.where((r) => !r.at.isBefore(cutoff)).toList();
+              final stats = tankStats(rows);
+              final cs = Theme.of(context).colorScheme;
+              if (all.length < 2) {
+                return Column(
+                  children: [
+                    if (both) _energySwitch(energy),
+                    Expanded(child: Center(child: Text('Charts appear after a couple of ${energy.nounPlural}'))),
+                  ],
+                );
+              }
+              // Spreading uses every fill, so the first period in range is complete.
+              final periods = periodTotals(allRows, _period, from: cutoff);
+              final totalKm = periods.fold<double>(0, (a, t) => a + t.km);
+              final totalCost = periods.fold<double>(0, (a, t) => a + t.cost);
+              final byMonth = _kmPerDayByMonth(rows);
+              final byDow = _fillsByWeekday(rows);
+              final unit = switch (_period) {
+                Period.week => 'week',
+                Period.month => 'month',
+                Period.year => 'year',
+              };
+              List<_Bar> series(double? Function(PeriodTotals) f) => [
+                for (var i = 0; i < periods.length; i++) _Bar(_axisLabel(periods, i), _fullLabel(periods[i].start), f(periods[i]) ?? 0),
               ];
-          final busiest = periods.isEmpty ? null : periods.reduce((a, b) => a.km >= b.km ? a : b);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            children: [
-              SegmentedButton<int>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 6, label: Text('6 mo')),
-                  ButtonSegment(value: 12, label: Text('1 yr')),
-                  ButtonSegment(value: 36, label: Text('3 yr')),
-                  ButtonSegment(value: 0, label: Text('All')),
+              final busiest = periods.isEmpty ? null : periods.reduce((a, b) => a.km >= b.km ? a : b);
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  if (both) _energySwitch(energy),
+                  SegmentedButton<int>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: 6, label: Text('6 mo')),
+                      ButtonSegment(value: 12, label: Text('1 yr')),
+                      ButtonSegment(value: 36, label: Text('3 yr')),
+                      ButtonSegment(value: 0, label: Text('All')),
+                    ],
+                    selected: {_rangeMonths},
+                    onSelectionChanged: (s) => setState(() {
+                      _rangeMonths = s.first;
+                      // Keep a sensible number of bars for the range.
+                      if (_rangeMonths == 0 && _period == Period.week) _period = Period.month;
+                      if (_rangeMonths == 6 && _period == Period.year) _period = Period.month;
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<Period>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: Period.week, label: Text('Weekly')),
+                      ButtonSegment(value: Period.month, label: Text('Monthly')),
+                      ButtonSegment(value: Period.year, label: Text('Yearly')),
+                    ],
+                    selected: {_period},
+                    onSelectionChanged: (s) => setState(() => _period = s.first),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilterChip(
+                      label: const Text('Show long trips in full'),
+                      selected: _full,
+                      onSelected: (v) => setState(() => _full = v),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ChartCard(
+                    title: 'Distance per $unit · km',
+                    caption:
+                        '${fmtKm(totalKm)} km in this range'
+                        '${busiest == null || busiest.km == 0 ? '' : ', most in ${_fullLabel(busiest.start)} (${fmtKm(busiest.km)} km)'}. '
+                        'Distance between two ${energy.nounPlural} is spread evenly over the days between them.'
+                        '${_full ? '' : ' Bars with a break at the top are off the scale; tap one for its value.'}',
+                    child: _bars(series((t) => t.km), cs.primary, fit: !_full),
+                  ),
+                  _ChartCard(
+                    title: '${energy.isCharge ? 'Charging' : 'Fuel'} spend per $unit · \$',
+                    caption: '${fmtMoney0(totalCost)} in this range',
+                    child: _bars(series((t) => t.cost), cs.tertiary, fit: !_full),
+                  ),
+                  _ChartCard(
+                    title: 'Cost per 100 km · \$ per $unit',
+                    caption: totalKm > 0 ? 'Average \$${(totalCost / totalKm * 100).toStringAsFixed(2)} per 100 km over the range' : '',
+                    child: _bars(series((t) => t.costPer100), cs.tertiary, fit: !_full),
+                  ),
+                  _ChartCard(
+                    title: 'Price per ${energy.isCharge ? 'kWh' : 'litre'} · \$ per $unit',
+                    caption: 'Average of the ${energy.nounPlural} made in each $unit. Empty bars had no ${energy.noun}.',
+                    child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, fit: !_full),
+                  ),
+                  _ChartCard(
+                    title: '${energy.isCharge ? 'Energy use' : 'Fuel economy'} · ${energy.per100}, rolling 5 ${energy.nounPlural}',
+                    caption: 'Dashed line is the rolling average; dots are single ${energy.isCharge ? 'charges' : 'tanks'}',
+                    child: _economy(stats, cs.primary),
+                  ),
+                  _ChartCard(
+                    title: 'Driving by month of year · average km per day',
+                    caption: _busiestMonths(byMonth),
+                    child: _bars([
+                      for (var m = 1; m <= 12; m++)
+                        _Bar('JFMAMJJASOND'[m - 1], DateFormat('MMMM').format(DateTime(2000, m)), byMonth[m] ?? 0),
+                    ], cs.primary),
+                  ),
+                  _ChartCard(
+                    title: '${energy.nounPluralCap} by weekday',
+                    caption:
+                        '${byDow.sublist(0, 5).fold(0, (a, b) => a + b)} weekday · ${byDow[5] + byDow[6]} weekend. Weekday vs weekend driving comes from recorded trips.',
+                    child: _bars(
+                      [
+                        for (var d = 0; d < 7; d++)
+                          _Bar('MTWTFSS'[d], DateFormat('EEEE').format(DateTime(2024, 1, d + 1)), byDow[d].toDouble()),
+                      ],
+                      cs.primary,
+                      decimals: 0,
+                    ),
+                  ),
                 ],
-                selected: {_rangeMonths},
-                onSelectionChanged: (s) => setState(() {
-                  _rangeMonths = s.first;
-                  // Keep a sensible number of bars for the range.
-                  if (_rangeMonths == 0 && _period == Period.week) _period = Period.month;
-                  if (_rangeMonths == 6 && _period == Period.year) _period = Period.month;
-                }),
-              ),
-              const SizedBox(height: 8),
-              SegmentedButton<Period>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: Period.week, label: Text('Weekly')),
-                  ButtonSegment(value: Period.month, label: Text('Monthly')),
-                  ButtonSegment(value: Period.year, label: Text('Yearly')),
-                ],
-                selected: {_period},
-                onSelectionChanged: (s) => setState(() => _period = s.first),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilterChip(
-                  label: const Text('Show long trips in full'),
-                  selected: _full,
-                  onSelected: (v) => setState(() => _full = v),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _ChartCard(
-                title: 'Distance per $unit · km',
-                caption: '${fmtKm(totalKm)} km in this range'
-                    '${busiest == null || busiest.km == 0 ? '' : ', most in ${_fullLabel(busiest.start)} (${fmtKm(busiest.km)} km)'}. '
-                    'Distance between two fill-ups is spread evenly over the days between them.'
-                    '${_full ? '' : ' Bars with a break at the top are off the scale; tap one for its value.'}',
-                child: _bars(series((t) => t.km), cs.primary, fit: !_full),
-              ),
-              _ChartCard(
-                title: 'Fuel spend per $unit · \$',
-                caption: '${fmtMoney0(totalCost)} in this range',
-                child: _bars(series((t) => t.cost), cs.tertiary, fit: !_full),
-              ),
-              _ChartCard(
-                title: 'Cost per 100 km · \$ per $unit',
-                caption: totalKm > 0 ? 'Average \$${(totalCost / totalKm * 100).toStringAsFixed(2)} per 100 km over the range' : '',
-                child: _bars(series((t) => t.costPer100), cs.tertiary, fit: !_full),
-              ),
-              _ChartCard(
-                title: 'Price per litre · \$ per $unit',
-                caption: 'Average of the fill-ups made in each $unit. Empty bars had no fill-up.',
-                child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, fit: !_full),
-              ),
-              _ChartCard(
-                title: 'Fuel economy · L/100 km, rolling 5 fills',
-                caption: 'Dashed line is the rolling average; dots are single tanks',
-                child: _economy(stats, cs.primary),
-              ),
-              _ChartCard(
-                title: 'Driving by month of year · average km per day',
-                caption: _busiestMonths(byMonth),
-                child: _bars([for (var m = 1; m <= 12; m++) _Bar('JFMAMJJASOND'[m - 1], DateFormat('MMMM').format(DateTime(2000, m)), byMonth[m] ?? 0)], cs.primary),
-              ),
-              _ChartCard(
-                title: 'Fill-ups by weekday',
-                caption: '${byDow.sublist(0, 5).fold(0, (a, b) => a + b)} weekday · ${byDow[5] + byDow[6]} weekend. Weekday vs weekend driving comes from recorded trips.',
-                child: _bars([for (var d = 0; d < 7; d++) _Bar('MTWTFSS'[d], DateFormat('EEEE').format(DateTime(2024, 1, d + 1)), byDow[d].toDouble())], cs.primary, decimals: 0),
-              ),
-            ],
+              );
+            },
           );
         },
       ),
     );
   }
+
+  Widget _energySwitch(Energy energy) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: SegmentedButton<String>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(value: 'fuel', label: Text('Fuel'), icon: Icon(Icons.local_gas_station)),
+        ButtonSegment(value: 'charge', label: Text('Charging'), icon: Icon(Icons.ev_station)),
+      ],
+      selected: {energy.eventKind},
+      onSelectionChanged: (s) => setState(() => _energyKind = s.first),
+    ),
+  );
 
   /// Label under every bar: 3-Nov, Nov-26, 2026.
   String _axisLabel(List<PeriodTotals> ps, int i) {
@@ -147,10 +195,10 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 
   String _fullLabel(DateTime d) => switch (_period) {
-        Period.week => 'week of ${DateFormat('d MMM yyyy').format(d)}',
-        Period.month => DateFormat('MMM yyyy').format(d),
-        Period.year => '${d.year}',
-      };
+    Period.week => 'week of ${DateFormat('d MMM yyyy').format(d)}',
+    Period.month => DateFormat('MMM yyyy').format(d),
+    Period.year => '${d.year}',
+  };
 
   /// Bar chart with a fixed value scale on the left and every bar labelled.
   /// When the bars don't fit, the chart scrolls sideways (newest showing).
@@ -168,13 +216,15 @@ class _InsightsPageState extends State<InsightsPage> {
     final bottomH = rotate ? 46.0 : 20.0;
     const axisW = 44.0;
     const labelStyle = TextStyle(fontSize: 10);
-    return LayoutBuilder(builder: (context, box) {
-      final plotH = box.maxHeight - bottomH;
-      // The same scale on both sides, so long or scrolled charts are easy to read.
-      Widget axis({required bool left}) => SizedBox(
-            width: axisW,
-            height: box.maxHeight,
-            child: Stack(children: [
+    return LayoutBuilder(
+      builder: (context, box) {
+        final plotH = box.maxHeight - bottomH;
+        // The same scale on both sides, so long or scrolled charts are easy to read.
+        Widget axis({required bool left}) => SizedBox(
+          width: axisW,
+          height: box.maxHeight,
+          child: Stack(
+            children: [
               for (final (v, pos) in scale.ticks)
                 Positioned(
                   left: left ? 0 : 6,
@@ -182,86 +232,102 @@ class _InsightsPageState extends State<InsightsPage> {
                   top: (plotH * (1 - pos / scale.top) - 7).clamp(0.0, plotH),
                   child: Text(scale.label(v), style: labelStyle, textAlign: left ? TextAlign.right : TextAlign.left),
                 ),
-            ]),
-          );
-      final minSlot = rotate ? 20.0 : 14.0;
-      final room = box.maxWidth - axisW * 2;
-      final width = math.max(room, data.length * minSlot);
-      final barW = (width / data.length * 0.6).clamp(2.0, 16.0);
-      final chart = BarChart(
-        BarChartData(
-          minY: 0,
-          maxY: scale.top,
-          alignment: BarChartAlignment.spaceAround,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            checkToShowHorizontalLine: (y) => scale.ticks.any((t) => (t.$2 - y).abs() < 1e-6),
-            horizontalInterval: scale.top / 200,
+            ],
           ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(),
-            rightTitles: const AxisTitles(),
-            leftTitles: const AxisTitles(),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: bottomH,
-                getTitlesWidget: (v, meta) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= data.length || data[i].label.isEmpty) return const SizedBox();
-                  final text = Text(data[i].label, style: labelStyle, maxLines: 1, softWrap: false);
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: rotate ? RotatedBox(quarterTurns: 3, child: text) : text,
-                  );
-                },
+        );
+        final minSlot = rotate ? 20.0 : 14.0;
+        final room = box.maxWidth - axisW * 2;
+        final width = math.max(room, data.length * minSlot);
+        final barW = (width / data.length * 0.6).clamp(2.0, 16.0);
+        final chart = BarChart(
+          BarChartData(
+            minY: 0,
+            maxY: scale.top,
+            alignment: BarChartAlignment.spaceAround,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              checkToShowHorizontalLine: (y) => scale.ticks.any((t) => (t.$2 - y).abs() < 1e-6),
+              horizontalInterval: scale.top / 200,
+            ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(),
+              rightTitles: const AxisTitles(),
+              leftTitles: const AxisTitles(),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: bottomH,
+                  getTitlesWidget: (v, meta) {
+                    final i = v.toInt();
+                    if (i < 0 || i >= data.length || data[i].label.isEmpty) return const SizedBox();
+                    final text = Text(data[i].label, style: labelStyle, maxLines: 1, softWrap: false);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: rotate ? RotatedBox(quarterTurns: 3, child: text) : text,
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              fitInsideHorizontally: true,
-              fitInsideVertically: true,
-              getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
-                '${data[g.x].tooltip}\n${_fmt(data[g.x].value, decimals)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+            barTouchData: BarTouchData(
+              touchTooltipData: BarTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+                  '${data[g.x].tooltip}\n${_fmt(data[g.x].value, decimals)}',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                ),
               ),
             ),
+            barGroups: [
+              for (var i = 0; i < data.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    if (data[i].value > scale.top)
+                      // Off the scale: full height with a break near the top.
+                      BarChartRodData(
+                        toY: scale.top,
+                        color: color,
+                        width: barW,
+                        borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1),
+                        rodStackItems: [
+                          BarChartRodStackItem(0, scale.top * 0.86, color),
+                          BarChartRodStackItem(scale.top * 0.86, scale.top * 0.9, surface),
+                          BarChartRodStackItem(scale.top * 0.9, scale.top, color),
+                        ],
+                      )
+                    else
+                      BarChartRodData(
+                        toY: scale.pos(data[i].value),
+                        color: color,
+                        width: barW,
+                        borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1),
+                      ),
+                  ],
+                ),
+            ],
           ),
-          barGroups: [
-            for (var i = 0; i < data.length; i++)
-              BarChartGroupData(x: i, barRods: [
-                if (data[i].value > scale.top)
-                  // Off the scale: full height with a break near the top.
-                  BarChartRodData(
-                    toY: scale.top,
-                    color: color,
-                    width: barW,
-                    borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1),
-                    rodStackItems: [
-                      BarChartRodStackItem(0, scale.top * 0.86, color),
-                      BarChartRodStackItem(scale.top * 0.86, scale.top * 0.9, surface),
-                      BarChartRodStackItem(scale.top * 0.9, scale.top, color),
-                    ],
-                  )
-                else
-                  BarChartRodData(toY: scale.pos(data[i].value), color: color, width: barW, borderRadius: BorderRadius.circular(barW > 6 ? 3 : 1)),
-              ]),
+        );
+        return Row(
+          children: [
+            axis(left: true),
+            Expanded(
+              child: width <= room
+                  ? chart
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: SizedBox(width: width, height: box.maxHeight, child: chart),
+                    ),
+            ),
+            axis(left: false),
           ],
-        ),
-      );
-      return Row(children: [
-        axis(left: true),
-        Expanded(
-          child: width <= room
-              ? chart
-              : SingleChildScrollView(scrollDirection: Axis.horizontal, reverse: true, child: SizedBox(width: width, height: box.maxHeight, child: chart)),
-        ),
-        axis(left: false),
-      ]);
-    });
+        );
+      },
+    );
   }
 
   String _fmt(double v, [int? decimals]) =>
@@ -308,7 +374,10 @@ class _InsightsPageState extends State<InsightsPage> {
               getTitlesWidget: (v, meta) {
                 final i = v.round();
                 if (i != v || i < 0 || i >= stats.length || i % every != 0) return const SizedBox();
-                return Padding(padding: const EdgeInsets.only(top: 4), child: Text(DateFormat('MMM-yy').format(stats[i].fill.at), style: style));
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(DateFormat('MMM-yy').format(stats[i].fill.at), style: style),
+                );
               },
             ),
           ),
@@ -402,7 +471,15 @@ class ChartScale {
     if (rough <= 0) return 1;
     final mag = math.pow(10, (math.log(rough) / math.ln10).floor()).toDouble();
     final f = rough / mag;
-    final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    final nice = f <= 1
+        ? 1
+        : f <= 2
+        ? 2
+        : f <= 2.5
+        ? 2.5
+        : f <= 5
+        ? 5
+        : 10;
     return nice * mag;
   }
 

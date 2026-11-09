@@ -85,3 +85,7 @@ More > Vehicle can fill in the car's details from its number plate using CarJam'
 ## Battery
 
 The trip recorder notes the phone's battery % at the start and end of each trip, and whether it was charging, so the trip page shows what recording actually cost.
+
+## Vehicles and charging
+
+Tap the vehicle name at the top of Home to switch vehicles or add one. Each vehicle has a type (petrol, diesel, hybrid, plug-in hybrid or electric) that decides which buttons and units the app shows (`lib/domain/energy.dart`). Charges are energy events of kind `charge`: kWh comes from the charger, or from the battery % before and after when the battery size is set, and home charges are costed from the home power rate kept in settings. Economy is worked out separately for fill-ups (L/100 km) and charges (kWh/100 km); a plug-in hybrid can switch between them in Insights. Charges are not sent to the Google Sheet.

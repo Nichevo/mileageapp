@@ -78,7 +78,7 @@ class CareAlertsBuilder extends StatelessWidget {
         builder: (context, policies) => StreamBuilder<List<TyreCheck>>(
           stream: scope.repo.watchTyreChecks(vid),
           builder: (context, checks) => StreamBuilder<List<EnergyEvent>>(
-            stream: scope.repo.watchEvents(vid),
+            stream: scope.repo.watchEvents(vid, kind: null),
             builder: (context, events) {
               if (!items.hasData || !policies.hasData || !checks.hasData || !events.hasData) return builder(context, null);
               return builder(

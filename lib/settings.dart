@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Small key/value settings. Stored in SharedPreferences, which Android backs
@@ -9,7 +10,13 @@ class Settings {
   static Future<Settings> load() async => Settings._(await SharedPreferences.getInstance());
 
   String? get activeVehicleId => _p.getString('activeVehicleId');
-  Future<void> setActiveVehicleId(String id) => _p.setString('activeVehicleId', id);
+  Future<void> setActiveVehicleId(String id) async {
+    await _p.setString('activeVehicleId', id);
+    activeVehicle.value = id;
+  }
+
+  /// Changes when you switch vehicles, so the app can rebuild for it.
+  late final ValueNotifier<String?> activeVehicle = ValueNotifier(activeVehicleId);
 
   String? get spreadsheetId => _p.getString('spreadsheetId');
   Future<void> setSpreadsheetId(String? id) async =>
@@ -50,6 +57,10 @@ class Settings {
   String? get carjamKey => _p.getString('carjamKey');
   Future<void> setCarjamKey(String? k) async =>
       k == null || k.trim().isEmpty ? await _p.remove('carjamKey') : await _p.setString('carjamKey', k.trim());
+
+  /// Home electricity rate for costing home EV charges, cents per kWh.
+  double get homeRateCents => _p.getDouble('homeRateCents') ?? 30;
+  Future<void> setHomeRateCents(double v) => _p.setDouble('homeRateCents', v);
 
   bool get useGps => _p.getBool('useGps') ?? true;
   Future<void> setUseGps(bool v) => _p.setBool('useGps', v);

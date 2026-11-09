@@ -100,6 +100,9 @@ void main() {
     final v = await repo.ensureVehicle();
     await settings.setActiveVehicleId(v.id);
     final client = MockClient((req) async => http.Response(jsonEncode(sample), 200));
+    tester.view.physicalSize = const Size(900, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(AppScope(repo: repo, settings: settings, child: MaterialApp(home: VehiclePage(carjamClient: client))));
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 150));

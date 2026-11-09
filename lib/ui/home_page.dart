@@ -11,7 +11,10 @@ import '../domain/reminders.dart';
 import '../domain/stats.dart';
 import 'care_page.dart';
 import 'fillup_form.dart';
+import '../domain/energy.dart';
+import 'charge_form.dart';
 import 'format.dart';
+import 'vehicle_page.dart' show showVehicleSwitcher;
 import 'insights_page.dart' show ChartScale;
 import 'prices_page.dart' show FuelPriceCard;
 import 'import_page.dart';
@@ -28,7 +31,7 @@ class HomePage extends StatelessWidget {
       builder: (context, vs) {
         final vehicle = vs.data?.where((v) => v.id == vehicleId).firstOrNull ?? vs.data?.firstOrNull;
         return StreamBuilder<List<EnergyEvent>>(
-          stream: scope.repo.watchEvents(vehicleId),
+          stream: scope.repo.watchEvents(vehicleId, kind: null),
           builder: (context, snap) {
             final events = snap.data ?? const <EnergyEvent>[];
             return _Dashboard(vehicle: vehicle, events: events);
@@ -46,7 +49,9 @@ class _Dashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = Repository.toFuelRows(events);
+    final kind = vehicle?.kind ?? 'petrol';
+    final energy = Energy.primaryFor(kind);
+    final rows = Repository.toFuelRows(events, kind: energy.eventKind);
     final stats = tankStats(rows); // ascending by odometer
     final lifetime = lifetimeTotals(rows);
     final latest = events.isNotEmpty ? events.first : null;
@@ -59,20 +64,46 @@ class _Dashboard extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(vehicle == null ? 'MileageLog' : '${vehicle!.name} · ${latest == null ? '' : '${fmtKm(latest.odometerKm)} km'}'),
+        title: InkWell(
+          onTap: () => showVehicleSwitcher(context),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Flexible(
+              child: Text(
+                vehicle == null ? 'MileageLog' : '${vehicle!.name}${latest == null ? '' : ' · ${fmtKm(latest.odometerKm)} km'}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ]),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          FilledButton.icon(
-            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FillUpForm())),
-            icon: const Icon(Icons.local_gas_station),
-            label: const Text('Log a fill-up', style: TextStyle(fontSize: 16)),
-          ),
+          Row(children: [
+            if (usesFuel(kind))
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FillUpForm())),
+                  icon: const Icon(Icons.local_gas_station),
+                  label: const Text('Log a fill-up', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            if (usesFuel(kind) && usesCharging(kind)) const SizedBox(width: 8),
+            if (usesCharging(kind))
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChargeForm())),
+                  icon: const Icon(Icons.ev_station),
+                  label: const Text('Log a charge', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+          ]),
           const SizedBox(height: 12),
           const ComingUpCard(),
-          FuelPriceCard(events: events),
+          if (usesFuel(kind)) FuelPriceCard(events: events.where((e) => e.kind == 'fuel').toList()),
           if ((latestEconomyChange(stats) ?? 0) >= 0.15)
             Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -96,9 +127,9 @@ class _Dashboard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('No fill-ups yet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    Text('No ${energy.nounPlural} yet', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     const SizedBox(height: 6),
-                    const Text('Import your history from the Google Sheet or the old app\'s export, or log your first fill.'),
+                    Text(energy.isCharge ? 'Log your first charge to start tracking kWh and cost per 100 km.' : 'Import your history from the Google Sheet or the old app\'s export, or log your first fill.'),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportPage())),
@@ -113,11 +144,11 @@ class _Dashboard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _Tile(label: 'Last tank', value: fmtPer100(lastTank?.litresPer100), unit: 'L/100 km'),
+                  child: _Tile(label: 'Last ${energy.fillWord}', value: fmtPer100(lastTank?.litresPer100), unit: energy.per100),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _Tile(label: 'Lifetime', value: fmtPer100(lifetime.per100), unit: 'L/100 km'),
+                  child: _Tile(label: 'Lifetime', value: fmtPer100(lifetime.per100), unit: energy.per100),
                 ),
               ],
             ),
@@ -128,7 +159,7 @@ class _Dashboard extends StatelessWidget {
                   child: _Tile(
                     label: 'Last price',
                     value: lastTank == null ? '—' : '\$${lastTank.pricePerUnit.toStringAsFixed(2)}',
-                    unit: '/L',
+                    unit: '/${energy.unit}',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -142,7 +173,7 @@ class _Dashboard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            _RangeTile(vehicle: vehicle, latest: latest, recentPer100: recent),
+            if (!energy.isCharge) _RangeTile(vehicle: vehicle, latest: latest, recentPer100: recent),
             const SizedBox(height: 8),
             Card(
               child: Padding(
@@ -150,11 +181,11 @@ class _Dashboard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('L/100 KM · LAST 10 FILLS', style: Theme.of(context).textTheme.labelSmall),
+                    Text('${energy.per100.toUpperCase()} · LAST 10 ${energy.nounPlural.toUpperCase()}', style: Theme.of(context).textTheme.labelSmall),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 150,
-                      child: _EconomyChart(stats: stats.length > 10 ? stats.sublist(stats.length - 10) : stats, color: cs.primary),
+                      child: _EconomyChart(stats: stats.length > 10 ? stats.sublist(stats.length - 10) : stats, color: cs.primary, unit: energy.per100),
                     ),
                   ],
                 ),
@@ -170,7 +201,7 @@ class _Dashboard extends StatelessWidget {
                     unit: 'km',
                     sub: thisYear == null
                         ? null
-                        : '${fmtMoney0(thisYear.cost)} · ${fmtKm(thisYear.quantity)} L · ${fmtPer100(thisYear.per100)} L/100',
+                        : '${fmtMoney0(thisYear.cost)} · ${fmtKm(thisYear.quantity)} ${energy.unit} · ${fmtPer100(thisYear.per100)} ${energy.unit}/100',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -179,7 +210,7 @@ class _Dashboard extends StatelessWidget {
                     label: 'Lifetime',
                     value: fmtKm(lifetime.km),
                     unit: 'km',
-                    sub: '${lifetime.fills} fills · ${fmtMoney0(lifetime.cost)}',
+                    sub: '${lifetime.fills} ${energy.nounPlural} · ${fmtMoney0(lifetime.cost)}',
                   ),
                 ),
               ],
@@ -258,7 +289,8 @@ class _RangeTile extends StatelessWidget {
 class _EconomyChart extends StatelessWidget {
   final List<TankStat> stats;
   final Color color;
-  const _EconomyChart({required this.stats, required this.color});
+  final String unit;
+  const _EconomyChart({required this.stats, required this.color, required this.unit});
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +353,7 @@ class _EconomyChart extends StatelessWidget {
             getTooltipItems: (touched) => [
               for (final t in touched)
                 LineTooltipItem(
-                  '${DateFormat('d MMM yyyy').format(points[t.x.round()].fill.at)}\n${t.y.toStringAsFixed(1)} L/100 km',
+                  '${DateFormat('d MMM yyyy').format(points[t.x.round()].fill.at)}\n${t.y.toStringAsFixed(1)} $unit',
                   const TextStyle(color: Colors.white, fontSize: 12),
                 ),
             ],

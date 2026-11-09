@@ -7,13 +7,16 @@ import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/carjam.dart';
+import '../domain/energy.dart';
 import '../vehicle/carjam_client.dart';
 import 'format.dart';
 
 class VehiclePage extends StatefulWidget {
   /// For tests: the HTTP client used for CarJam lookups.
   final http.Client? carjamClient;
-  const VehiclePage({super.key, this.carjamClient});
+  /// Add a new vehicle (and switch to it on save) instead of editing the current one.
+  final bool isNew;
+  const VehiclePage({super.key, this.carjamClient, this.isNew = false});
   @override
   State<VehiclePage> createState() => _VehiclePageState();
 }
@@ -28,6 +31,8 @@ class _VehiclePageState extends State<VehiclePage> {
   final _rated = TextEditingController();
   final _notes = TextEditingController();
   Vehicle? _v;
+  String _kind = 'petrol';
+  bool _loaded = false;
   CarDetails? _found;
   bool _looking = false;
   bool _datesApplied = false;
@@ -41,10 +46,16 @@ class _VehiclePageState extends State<VehiclePage> {
 
   Future<void> _load() async {
     final scope = AppScope.of(context);
+    if (widget.isNew) {
+      setState(() => _loaded = true);
+      return;
+    }
     final v = await scope.repo.vehicle(scope.settings.activeVehicleId!);
     if (v == null || !mounted) return;
     setState(() {
       _v = v;
+      _loaded = true;
+      _kind = v.kind;
       _plate.text = scope.settings.plateFor(v.id) ?? '';
       _name.text = v.name;
       _make.text = v.make ?? '';
@@ -58,11 +69,13 @@ class _VehiclePageState extends State<VehiclePage> {
 
   Future<void> _save() async {
     final scope = AppScope.of(context);
+    final name = _name.text.trim().isEmpty ? 'My car' : _name.text.trim();
+    _v ??= await scope.repo.addVehicle(name, _kind);
     await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
     await scope.repo.saveVehicle(VehiclesCompanion(
       id: Value(_v!.id),
-      name: Value(_name.text.trim().isEmpty ? 'My car' : _name.text.trim()),
-      kind: Value(_v!.kind),
+      name: Value(name),
+      kind: Value(_kind),
       make: Value(_make.text.trim().isEmpty ? null : _make.text.trim()),
       model: Value(_model.text.trim().isEmpty ? null : _model.text.trim()),
       year: Value(int.tryParse(_year.text)),
@@ -71,6 +84,7 @@ class _VehiclePageState extends State<VehiclePage> {
       notes: Value(_notes.text.trim().isEmpty ? null : _notes.text.trim()),
       createdAt: Value(_v!.createdAt),
     ));
+    if (widget.isNew) await scope.settings.setActiveVehicleId(_v!.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -87,10 +101,20 @@ class _VehiclePageState extends State<VehiclePage> {
     });
     try {
       final d = await CarJamClient.lookup(_plate.text, key, client: widget.carjamClient);
-      await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
+      if (_v != null) await scope.settings.setPlate(_v!.id, normalisePlate(_plate.text));
       if (!mounted) return;
       setState(() {
         _found = d;
+        final f = d.fuelType?.toLowerCase() ?? '';
+        if (f.contains('electric') && !f.contains('petrol')) {
+          _kind = 'ev';
+        } else if (f.contains('diesel')) {
+          _kind = 'diesel';
+        } else if (f.contains('plug')) {
+          _kind = 'phev';
+        } else if (f.contains('hybrid')) {
+          _kind = 'hybrid';
+        }
         _datesApplied = false;
         if (d.make != null) _make.text = d.summaryMake;
         if (d.model != null) _model.text = d.summaryModel;
@@ -163,8 +187,8 @@ class _VehiclePageState extends State<VehiclePage> {
     final t = Theme.of(context).textTheme;
     final hasKey = AppScope.of(context).settings.carjamKey != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Vehicle')),
-      body: _v == null
+      appBar: AppBar(title: Text(widget.isNew ? 'Add a vehicle' : 'Vehicle')),
+      body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
@@ -204,6 +228,11 @@ class _VehiclePageState extends State<VehiclePage> {
                 const SizedBox(height: 12),
                 TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final k in vehicleKinds)
+                    ChoiceChip(label: Text(vehicleKindLabel(k)), selected: _kind == k, onSelected: (_) => setState(() => _kind = k)),
+                ]),
+                const SizedBox(height: 12),
                 Row(children: [
                   Expanded(child: TextField(controller: _make, decoration: const InputDecoration(labelText: 'Make', border: OutlineInputBorder()))),
                   const SizedBox(width: 12),
@@ -213,10 +242,10 @@ class _VehiclePageState extends State<VehiclePage> {
                 Row(children: [
                   Expanded(child: TextField(controller: _year, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()))),
                   const SizedBox(width: 12),
-                  Expanded(child: TextField(controller: _tank, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Tank size (L)', border: OutlineInputBorder()))),
+                  Expanded(child: TextField(controller: _tank, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _kind == 'ev' ? 'Battery (kWh)' : 'Tank size (L)', border: const OutlineInputBorder()))),
                 ]),
                 const SizedBox(height: 12),
-                TextField(controller: _rated, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Rated economy (L/100 km)', helperText: 'The maker\'s figure, shown as a benchmark', border: OutlineInputBorder())),
+                TextField(controller: _rated, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Rated economy (${Energy.primaryFor(_kind).per100})', helperText: 'The maker\'s figure, shown as a benchmark', border: const OutlineInputBorder())),
                 const SizedBox(height: 12),
                 TextField(controller: _notes, maxLines: 3, decoration: const InputDecoration(labelText: 'Notes (stay on this phone)', border: OutlineInputBorder())),
                 const SizedBox(height: 20),
@@ -292,5 +321,41 @@ Future<void> applyExpiryDates(Repository repo, String vehicleId, {DateTime? wofE
       notes: Value(existing?.notes),
       active: const Value(true),
     ));
+  }
+}
+
+/// Bottom sheet listing your vehicles: tap one to switch, or add another.
+Future<void> showVehicleSwitcher(BuildContext context) async {
+  final scope = AppScope.of(context);
+  final vehicles = await scope.repo.vehicles();
+  if (!context.mounted) return;
+  vehicles.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  final picked = await showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    builder: (c) => SafeArea(
+      child: ListView(shrinkWrap: true, children: [
+        for (final v in vehicles)
+          ListTile(
+            leading: Icon(v.kind == 'ev' ? Icons.electric_car : Icons.directions_car),
+            title: Text(v.name),
+            subtitle: Text([vehicleKindLabel(v.kind), ?v.make, ?v.model].join(' · ')),
+            trailing: v.id == scope.settings.activeVehicleId ? const Icon(Icons.check) : null,
+            onTap: () => Navigator.pop(c, v.id),
+          ),
+        ListTile(
+          leading: const Icon(Icons.add),
+          title: const Text('Add a vehicle'),
+          subtitle: const Text('Petrol, diesel, hybrid, plug-in hybrid or electric'),
+          onTap: () => Navigator.pop(c, '+'),
+        ),
+      ]),
+    ),
+  );
+  if (picked == null || !context.mounted) return;
+  if (picked == '+') {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage(isNew: true)));
+  } else if (picked != scope.settings.activeVehicleId) {
+    await scope.settings.setActiveVehicleId(picked);
   }
 }
