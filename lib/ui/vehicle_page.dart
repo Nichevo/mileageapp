@@ -267,6 +267,14 @@ class _VehiclePageState extends State<VehiclePage> {
                 TextField(controller: _notes, maxLines: 3, decoration: const InputDecoration(labelText: 'Notes (stay on this phone)', border: OutlineInputBorder())),
                 const SizedBox(height: 20),
                 FilledButton(onPressed: _save, child: const Text('Save')),
+                if (!widget.isNew) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const VehiclePage(isNew: true))),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add another vehicle'),
+                  ),
+                ],
               ],
             ),
     );
@@ -361,6 +369,11 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
             onTap: () => Navigator.pop(c, v.id),
           ),
         ListTile(
+          leading: const Icon(Icons.edit_outlined),
+          title: const Text('Edit the current vehicle'),
+          onTap: () => Navigator.pop(c, 'edit'),
+        ),
+        ListTile(
           leading: const Icon(Icons.add),
           title: const Text('Add a vehicle'),
           subtitle: const Text('Petrol, diesel, hybrid, plug-in hybrid or electric'),
@@ -372,6 +385,8 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
   if (picked == null || !context.mounted) return;
   if (picked == '+') {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage(isNew: true)));
+  } else if (picked == 'edit') {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage()));
   } else if (picked != scope.settings.activeVehicleId) {
     await scope.settings.setActiveVehicleId(picked);
   }

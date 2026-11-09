@@ -155,9 +155,9 @@ class _MorePageState extends State<MorePage> {
         children: [
           ListTile(
             leading: const Icon(Icons.directions_car_outlined),
-            title: const Text('Vehicle'),
-            subtitle: const Text('Name, tank size, rated economy'),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage())),
+            title: const Text('Vehicles'),
+            subtitle: const Text('Switch, add another, or edit details'),
+            onTap: () => showVehicleSwitcher(context),
           ),
           ListTile(
             leading: const Icon(Icons.handyman_outlined),

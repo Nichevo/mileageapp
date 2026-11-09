@@ -10,6 +10,7 @@ import 'package:mileagelog/settings.dart';
 import 'package:mileagelog/ui/charge_form.dart';
 import 'package:mileagelog/ui/history_page.dart';
 import 'package:mileagelog/ui/insights_page.dart';
+import 'package:mileagelog/ui/vehicle_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> settle(WidgetTester tester, [int n = 5]) async {
@@ -128,6 +129,36 @@ void main() {
     expect(find.text('WHERE YOU CHARGE'), findsOneWidget);
     expect(find.textContaining('Fast DC 50%'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await closeDb(tester, db);
+  });
+
+  testWidgets('a second vehicle can be added and becomes the current one', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final db = AppDatabase(NativeDatabase.memory());
+    final repo = Repository(db);
+    final settings = await Settings.load();
+    final v = await repo.ensureVehicle();
+    await settings.setActiveVehicleId(v.id);
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(AppScope(repo: repo, settings: settings, child: const MaterialApp(home: VehiclePage())));
+    await settle(tester);
+    expect(find.text('Add another vehicle'), findsOneWidget);
+    await tester.tap(find.text('Add another vehicle'));
+    await settle(tester);
+    expect(find.text('Add a vehicle'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Leaf');
+    await tester.tap(find.text('Electric'));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await settle(tester);
+    final all = (await tester.runAsync(() => repo.vehicles()))!;
+    expect(all.length, 2);
+    final leaf = all.firstWhere((x) => x.name == 'Leaf');
+    expect(leaf.kind, 'ev');
+    expect(settings.activeVehicleId, leaf.id);
     await closeDb(tester, db);
   });
 }
