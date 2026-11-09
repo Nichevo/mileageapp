@@ -54,6 +54,10 @@ class Settings {
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
 
   /// The car's number plate, per vehicle. Kept on the phone only.
+  /// Merge suggestions the user said no to ("earlierId+laterId").
+  List<String> get dismissedMerges => _p.getStringList('dismissedMerges') ?? const [];
+  Future<void> dismissMerge(String key) => _p.setStringList('dismissedMerges', [...dismissedMerges, key]);
+
   /// Odometer reading the road user charges licence runs to.
   double? rucUntilKm(String vehicleId) => _p.getDouble('ruc_$vehicleId');
   Future<void> setRucUntilKm(String vehicleId, double? km) async =>

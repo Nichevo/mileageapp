@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -8,6 +10,7 @@ import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/reminders.dart' show tollPayBy, tollPayDays;
 import '../domain/road_match.dart';
+import '../domain/trip_profile.dart';
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
 import '../trips/road_lookup.dart';
@@ -26,6 +29,7 @@ class TripDetailPage extends StatefulWidget {
 
 class _TripDetailPageState extends State<TripDetailPage> {
   List<TripPoint>? _points;
+  List<ProfilePoint> _profile = const [];
   List<TripStop> _stops = const [];
   TripStats? _stats;
   ({double per100, double price})? _fuel;
@@ -75,6 +79,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
       _points = pts;
       _stops = stops;
       _stats = samples.length > 1 ? computeTripStats(samples) : null;
+      _profile = tripProfile(samples);
       _fuel = per100 == null || tanks.isEmpty ? null : (per100: per100, price: tanks.last.pricePerUnit);
     });
   }
@@ -153,7 +158,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
                       SizedBox(
                         height: 300,
                         child: TripMap(
-                          route: [for (final p in _points!) if ((p.accuracyM ?? 0) <= maxAccuracyM) LatLng(p.lat, p.lon)],
+                          route: [for (final p in _accurate) LatLng(p.lat, p.lon)],
+                          speedsKmh: pointSpeedsKmh([
+                            for (final p in _accurate) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM),
+                          ]),
                           stops: [for (final s in _stops) if (s.lat != null) LatLng(s.lat!, s.lon!)],
                           lights: [for (final l in road?.lights ?? const <LightPass>[]) (at: LatLng(l.lat, l.lon), stopped: l.stopped)],
                         ),
@@ -172,6 +180,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
                           if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
+                          if (_stats != null) ..._chartsSection(context),
                           if (_stats != null) ...[const SizedBox(height: 20), _roadSection(context, road)],
                           const SizedBox(height: 20),
                           _costsSection(context, trip, road),
@@ -183,6 +192,79 @@ class _TripDetailPageState extends State<TripDetailPage> {
         );
       },
     );
+  }
+
+  List<TripPoint> get _accurate => [for (final p in _points ?? const <TripPoint>[]) if ((p.accuracyM ?? 0) <= maxAccuracyM) p];
+
+  /// Speed, and elevation when the phone recorded it, through the trip.
+  List<Widget> _chartsSection(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final speed = [for (final p in _profile) if (p.kmh != null) FlSpot(p.minutes, p.kmh!)];
+    final alt = [for (final p in _profile) if (p.altitudeM != null) FlSpot(p.minutes, p.altitudeM!)];
+    if (speed.length < 3) return const [];
+    Widget chart(String title, List<FlSpot> spots, Color colour, String unit, {bool fromZero = true}) {
+      final ys = spots.map((s) => s.y);
+      final lo = fromZero ? 0.0 : ys.reduce(math.min), hi = ys.reduce(math.max);
+      final pad = math.max(5.0, (hi - lo) * 0.1);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 16),
+        Text(title, style: t.titleSmall),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 150,
+          child: LineChart(LineChartData(
+            minY: fromZero ? 0 : (lo - pad).floorToDouble(),
+            maxY: (hi + pad).ceilToDouble(),
+            minX: 0,
+            maxX: spots.last.x,
+            gridData: const FlGridData(drawVerticalLine: false),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36, getTitlesWidget: (v, m) => Text(v.round().toString(), style: t.labelSmall))),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 22,
+                  interval: _niceMinutes(spots.last.x),
+                  getTitlesWidget: (v, m) => Text('${v.round()} min', style: t.labelSmall),
+                ),
+              ),
+            ),
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipItems: (items) => [for (final i in items) LineTooltipItem('${i.y.round()} $unit\n${i.x.round()} min', TextStyle(color: cs.onInverseSurface))],
+              ),
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                curveSmoothness: 0.15,
+                color: colour,
+                barWidth: 2,
+                dotData: const FlDotData(show: false),
+                belowBarData: BarAreaData(show: true, color: colour.withValues(alpha: 0.15)),
+              ),
+            ],
+          )),
+        ),
+      ]);
+    }
+
+    return [
+      chart('Speed · km/h', speed, cs.primary, 'km/h'),
+      if (alt.length >= 3) chart('Elevation · m (phone GPS)', alt, cs.tertiary, 'm', fromZero: false),
+    ];
+  }
+
+  static double _niceMinutes(double total) {
+    for (final step in [1.0, 2, 5, 10, 15, 30, 60, 120, 240]) {
+      if (total / step <= 6) return step.toDouble();
+    }
+    return 480;
   }
 
   List<Widget> _statsSection(BuildContext context, TripStats s, RoadStats? road, TripBattery? battery) {

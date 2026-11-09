@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../app.dart';
 import '../data/database.dart';
+import '../domain/trip_filter.dart';
 import '../domain/trip_stats.dart';
 import '../trips/recorder.dart';
 import '../trips/road_lookup.dart';
@@ -27,6 +28,12 @@ class _TripsPageState extends State<TripsPage> {
   Timer? _timer;
   bool _busy = false;
   ({String? address, String? name, bool autoStart})? _car;
+  TripSort _sort = TripSort.newest;
+  TripPeriod _period = TripPeriod.all;
+  TripSize _size = TripSize.any;
+  final _selected = <String>{};
+  /// First and last points of trips that might be merged, loaded on demand.
+  final _ends = <String, ({({double lat, double lon}) from, ({double lat, double lon}) to})?>{};
 
   @override
   void initState() {
@@ -81,6 +88,22 @@ class _TripsPageState extends State<TripsPage> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    if (_selected.isNotEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(_selected.clear)),
+          title: Text('${_selected.length} selected'),
+          actions: [
+            TextButton.icon(
+              onPressed: _selected.length < 2 ? null : () => _merge(_selected.toList()),
+              icon: const Icon(Icons.merge),
+              label: const Text('Merge'),
+            ),
+          ],
+        ),
+        body: _list(scope),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trips'),
@@ -96,14 +119,48 @@ class _TripsPageState extends State<TripsPage> {
           ),
         ],
       ),
-      body: StreamBuilder<List<Trip>>(
-        stream: scope.repo.watchTrips(scope.settings.activeVehicleId!),
-        builder: (context, snap) {
-          final trips = (snap.data ?? const <Trip>[]).where((t) => t.status != 'recording' || t.id == _currentId).toList();
-          final done = trips.where((t) => t.status == 'done').toList();
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
+      body: _list(scope),
+    );
+  }
+
+  static TripStats? _statsOf(Trip t) => t.statsJson == null ? null : TripStats.fromJson(jsonDecode(t.statsJson!) as Map<String, Object?>);
+
+  TripRow _row(Trip t) {
+    final s = _statsOf(t);
+    final odoKm = t.startOdometerKm != null && t.endOdometerKm != null ? t.endOdometerKm! - t.startOdometerKm! : null;
+    final e = _ends[t.id];
+    return TripRow(
+      id: t.id,
+      start: t.startAt,
+      end: t.endAt,
+      km: s?.distanceKm ?? t.gpsDistanceKm ?? odoKm,
+      duration: s?.total ?? (t.endAt?.difference(t.startAt)),
+      avgKmh: s?.movingAvgKmh,
+      from: e?.from,
+      to: e?.to,
+    );
+  }
+
+  Widget _list(AppScope scope) {
+    return StreamBuilder<List<Trip>>(
+      stream: scope.repo.watchTrips(scope.settings.activeVehicleId!),
+      builder: (context, snap) {
+        final trips = (snap.data ?? const <Trip>[]).where((t) => t.status != 'recording' || t.id == _currentId).toList();
+        final done = trips.where((t) => t.status == 'done').toList();
+        final byId = {for (final t in trips) t.id: t};
+        final rows = filterTrips(
+          [for (final t in trips) if (t.id != _currentId) _row(t)],
+          sort: _sort,
+          period: _period,
+          size: _size,
+          now: DateTime.now(),
+        );
+        final suggestions = _suggestions(scope, done);
+        final filtered = _period != TripPeriod.all || _size != TripSize.any;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            if (_selected.isEmpty) ...[
               if (!TripRecorder.supported)
                 const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Trip recording works on the Android app.')))
               else if (_currentId != null)
@@ -112,18 +169,127 @@ class _TripsPageState extends State<TripsPage> {
                 _startCard(context),
               const SizedBox(height: 16),
               if (done.isNotEmpty) _yearSummary(context, done),
-              const SizedBox(height: 8),
-              if (trips.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('No trips yet. Start one above, or set up auto-start so trips record themselves when the phone connects to the car.', textAlign: TextAlign.center),
+              for (final (a, b) in suggestions)
+                if (byId[a] != null && byId[b] != null) _suggestionCard(context, scope, byId[a]!, byId[b]!),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('Tap trips to select them. Merging joins them into one trip, with the time between them as a stop.',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ),
+            const SizedBox(height: 8),
+            if (trips.isNotEmpty) _filterBar(context),
+            if (trips.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('No trips yet. Start one above, or set up auto-start so trips record themselves when the phone connects to the car.', textAlign: TextAlign.center),
+              )
+            else if (rows.isEmpty)
+              const Padding(padding: EdgeInsets.all(24), child: Text('No trips match these filters.', textAlign: TextAlign.center))
+            else if (filtered)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '${rows.length} trip${rows.length == 1 ? '' : 's'} · ${fmtKm(rows.fold(0.0, (a, r) => a + (r.km ?? 0)))} km',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              for (final t in trips.where((t) => t.id != _currentId)) _tripTile(context, t),
-            ],
-          );
-        },
+              ),
+            for (final r in rows) _tripTile(context, byId[r.id]!),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _filterBar(BuildContext context) {
+    Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, {bool highlight = false}) =>
+        PopupMenuButton<T>(
+          initialValue: value,
+          onSelected: (v) => setState(() => set(v)),
+          itemBuilder: (_) => [for (final v in values) PopupMenuItem(value: v, child: Text(label(v)))],
+          child: Chip(
+            avatar: Icon(icon, size: 18),
+            label: Text(label(value)),
+            backgroundColor: highlight ? Theme.of(context).colorScheme.secondaryContainer : null,
+          ),
+        );
+    return Wrap(spacing: 8, runSpacing: 4, children: [
+      menu(Icons.sort, _sort, TripSort.values, tripSortLabel, (v) => _sort = v),
+      menu(Icons.date_range, _period, TripPeriod.values, tripPeriodLabel, (v) => _period = v, highlight: _period != TripPeriod.all),
+      menu(Icons.straighten, _size, TripSize.values, tripSizeLabel, (v) => _size = v, highlight: _size != TripSize.any),
+    ]);
+  }
+
+  /// Recent trips that look like one journey split in two. Their end points
+  /// are loaded the first time they're seen, then checked for distance.
+  List<(String, String)> _suggestions(AppScope scope, List<Trip> done) {
+    final since = DateTime.now().subtract(const Duration(days: 30));
+    final recent = done.where((t) => t.startAt.isAfter(since) && t.statsJson != null).toList();
+    final byTime = mergeSuggestions([for (final t in recent) _row(t)]);
+    final dismissed = scope.settings.dismissedMerges.toSet();
+    final missing = {for (final (a, b) in byTime) ...[a, b]}.where((id) => !_ends.containsKey(id)).toList();
+    if (missing.isNotEmpty) {
+      for (final id in missing) {
+        _ends[id] = null;
+      }
+      Future.wait(missing.map((id) async => _ends[id] = await scope.repo.tripEnds(id))).then((_) {
+        if (mounted) setState(() {});
+      });
+      return const [];
+    }
+    return mergeSuggestions([for (final t in recent) _row(t)])
+        .where((p) => _ends[p.$1] != null && _ends[p.$2] != null && !dismissed.contains('${p.$1}+${p.$2}'))
+        .take(3)
+        .toList();
+  }
+
+  Widget _suggestionCard(BuildContext context, AppScope scope, Trip a, Trip b) {
+    final gap = a.endAt == null ? null : b.startAt.difference(a.endAt!);
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('One journey in two parts?', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text('"${a.name}" and "${b.name}"${gap == null ? '' : ' are ${fmtDuration(gap)} apart'}, and the second starts where the first ended.'),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            TextButton(
+              onPressed: () async {
+                await scope.settings.dismissMerge('${a.id}+${b.id}');
+                setState(() {});
+              },
+              child: const Text('Keep separate'),
+            ),
+            FilledButton.tonal(onPressed: () => _merge([a.id, b.id]), child: const Text('Merge')),
+          ]),
+        ]),
       ),
     );
+  }
+
+  Future<void> _merge(List<String> ids) async {
+    final scope = AppScope.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Merge ${ids.length} trips?'),
+        content: const Text('They become one trip named after the first. The time between them shows as a stop. This can\'t be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Merge')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final trips = [for (final id in ids) await scope.repo.trip(id)];
+    if (trips.any((t) => t == null || t.status != 'done')) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only recorded trips can be merged')));
+      return;
+    }
+    await scope.repo.mergeTrips(ids);
+    if (scope.settings.roadLookup) RoadLookup.analyseRecent(scope.repo, scope.settings.activeVehicleId!);
+    if (mounted) setState(_selected.clear);
   }
 
   Widget _startCard(BuildContext context) {
@@ -248,15 +414,26 @@ class _TripsPageState extends State<TripsPage> {
       if (road != null && road.lightsPassed > 0) '${road.stoppedAtLights} of ${road.lightsPassed} lights red',
       if (trip.status == 'report') 'odometer only',
     ];
+    final selecting = _selected.isNotEmpty;
+    final selected = _selected.contains(trip.id);
+    void toggle() => setState(() => selected ? _selected.remove(trip.id) : _selected.add(trip.id));
     return ListTile(
       contentPadding: EdgeInsets.zero,
+      selected: selected,
       leading: CircleAvatar(
-        child: Icon(trip.status == 'report' ? Icons.description_outlined : (trip.startedBy == 'bluetooth' ? Icons.bluetooth : Icons.route)),
+        child: Icon(selected
+            ? Icons.check
+            : trip.status == 'report'
+                ? Icons.description_outlined
+                : (trip.startedBy == 'bluetooth' ? Icons.bluetooth : Icons.route)),
       ),
       title: Text(trip.name),
       subtitle: Text(parts.join(' · ')),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailPage(tripId: trip.id))),
+      trailing: selecting ? null : const Icon(Icons.chevron_right),
+      onLongPress: trip.status == 'done' ? toggle : null,
+      onTap: selecting
+          ? (trip.status == 'done' ? toggle : null)
+          : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailPage(tripId: trip.id))),
     );
   }
 }

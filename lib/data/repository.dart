@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/stats.dart';
+import '../domain/trip_stats.dart';
 import '../import/roadtrip_csv.dart';
 import '../import/sheet_csv.dart';
 import '../domain/sharetank.dart';
@@ -313,6 +316,65 @@ class Repository {
         await (db.delete(db.tripPoints)..where((p) => p.tripId.equals(id))).go();
         await (db.delete(db.tripStops)..where((s) => s.tripId.equals(id))).go();
         await (db.delete(db.trips)..where((t) => t.id.equals(id))).go();
+      });
+
+  /// First and last GPS point of a trip, for spotting trips that continue
+  /// one another.
+  Future<({({double lat, double lon}) from, ({double lat, double lon}) to})?> tripEnds(String tripId) async {
+    final first = await (db.select(db.tripPoints)
+          ..where((p) => p.tripId.equals(tripId))
+          ..orderBy([(p) => OrderingTerm.asc(p.at)])
+          ..limit(1))
+        .getSingleOrNull();
+    final last = await (db.select(db.tripPoints)
+          ..where((p) => p.tripId.equals(tripId))
+          ..orderBy([(p) => OrderingTerm.desc(p.at)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (first == null || last == null) return null;
+    return (from: (lat: first.lat, lon: first.lon), to: (lat: last.lat, lon: last.lon));
+  }
+
+  /// Joins recorded trips into the earliest one: points, tolls and parking
+  /// move across, the time between them becomes a stop, and stats are
+  /// worked out again (the road lookup is redone later). Returns the id kept.
+  Future<String> mergeTrips(List<String> ids) => db.transaction(() async {
+        final trips = [for (final id in ids) (await trip(id))!]..sort((a, b) => a.startAt.compareTo(b.startAt));
+        final keep = trips.first, last = trips.last;
+        final others = trips.skip(1).map((t) => t.id).toList();
+        await (db.update(db.tripPoints)..where((p) => p.tripId.isIn(others))).write(TripPointsCompanion(tripId: Value(keep.id)));
+        await (db.update(db.expenses)..where((e) => e.tripId.isIn(others))).write(ExpensesCompanion(tripId: Value(keep.id)));
+        await (db.delete(db.tripStops)..where((s) => s.tripId.isIn([keep.id, ...others]))).go();
+        final pts = await tripPoints(keep.id);
+        final samples = [
+          for (final p in pts) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM, altitudeM: p.altitudeM),
+        ];
+        final stats = computeTripStats(samples);
+        Map<String, Object?> j(Trip t) => t.statsJson == null ? {} : (jsonDecode(t.statsJson!) as Map<String, Object?>);
+        final b0 = j(keep)['battery'], b1 = j(last)['battery'];
+        final json = <String, Object?>{
+          ...stats.toJson(),
+          if (b0 is Map && b1 is Map)
+            'battery': {
+              'start': b0['start'],
+              'end': b1['end'],
+              'charging': trips.any((t) => (j(t)['battery'] as Map?)?['charging'] == true),
+            },
+          'merged': trips.length,
+        };
+        await (db.update(db.trips)..where((t) => t.id.equals(keep.id))).write(TripsCompanion(
+          endAt: Value(last.endAt ?? keep.endAt),
+          endOdometerKm: Value(last.endOdometerKm ?? keep.endOdometerKm),
+          gpsDistanceKm: Value(stats.distanceKm),
+          statsJson: Value(jsonEncode(json)),
+          notes: Value([for (final t in trips) if (t.notes != null) t.notes!].join('\n').trim().isEmpty ? null : [for (final t in trips) if (t.notes != null) t.notes!].join('\n')),
+        ));
+        await db.batch((b) => b.insertAll(db.tripStops, [
+              for (final st in stats.stops)
+                TripStopsCompanion.insert(id: newId(), tripId: keep.id, arriveAt: st.arrive, departAt: Value(st.depart), lat: Value(st.lat), lon: Value(st.lon)),
+            ]));
+        await (db.delete(db.trips)..where((t) => t.id.isIn(others))).go();
+        return keep.id;
       });
 
   /// Replaces a trip's points and stops in one go (used when a recording ends).

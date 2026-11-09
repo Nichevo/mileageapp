@@ -138,6 +138,8 @@ const double stillKmh = 3; // below this the car counts as stopped
 const Duration shortStopMin = Duration(seconds: 5); // traffic lights, give-ways
 const Duration shortStopMax = Duration(seconds: 120);
 const double maxAccuracyM = 50; // samples worse than this are ignored
+/// The recorder samples at least every 15 s, so a longer silence is a gap.
+const Duration recordingGap = Duration(minutes: 2);
 const double urbanMaxKmh = 60;
 const double openRoadMaxKmh = 90;
 const double harshMps2 = 3.0; // about 0.3 g
@@ -210,6 +212,17 @@ TripStats computeTripStats(List<GpsSample> raw) {
     if (dt <= Duration.zero) continue;
     final segKm = haversineKm(a.lat, a.lon, b.lat, b.lon);
     final hours = dt.inMilliseconds / 3600000;
+    // A gap in recording (two trips merged, or the phone paused GPS): a stop
+    // if the car is where it was, otherwise unknown and left out.
+    if (dt > recordingGap) {
+      closeStill(a.at);
+      if (segKm <= 0.3) {
+        stopped += dt;
+        stops.add(StopSpan(a.at, b.at, a.lat, a.lon));
+      }
+      prevKmh = null;
+      continue;
+    }
     // Prefer the receiver's Doppler speed; fall back to distance over time.
     final kmh = b.speedMps != null ? b.speedMps! * 3.6 : segKm / hours;
     // Ignore jumps that imply an impossible speed (GPS glitch).

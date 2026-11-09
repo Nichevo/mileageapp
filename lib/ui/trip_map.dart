@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../domain/trip_profile.dart';
+
 /// OpenStreetMap view of a route with optional stop markers. Map tiles are
 /// fetched from openstreetmap.org; the route itself is only sent out for the
 /// optional road lookup (see lib/trips/road_lookup.dart).
@@ -12,7 +14,31 @@ class TripMap extends StatelessWidget {
   /// red where it stopped.
   final List<({LatLng at, bool stopped})> lights;
   final bool follow; // live view: centre on the latest point
-  const TripMap({super.key, required this.route, this.stops = const [], this.lights = const [], this.follow = false});
+  /// Speed at each route point (km/h). When given, the line is coloured by
+  /// speed and a legend is shown.
+  final List<double?>? speedsKmh;
+  const TripMap({super.key, required this.route, this.stops = const [], this.lights = const [], this.follow = false, this.speedsKmh});
+
+  /// Slow to fast: red, orange, amber, light green, green.
+  static const speedColours = [Color(0xffd32f2f), Color(0xfff57c00), Color(0xfffbc02d), Color(0xff7cb342), Color(0xff2e7d32)];
+
+  /// Splits the route into runs of the same speed colour.
+  static List<Polyline> speedLines(List<LatLng> route, List<double?> kmh) {
+    final out = <Polyline>[];
+    if (route.length < 2 || kmh.length != route.length) return out;
+    var band = speedBand(kmh[0]);
+    var run = <LatLng>[route[0]];
+    for (var i = 1; i < route.length; i++) {
+      final b = speedBand(kmh[i]);
+      run.add(route[i]);
+      if (b != band || i == route.length - 1) {
+        out.add(Polyline(points: run, strokeWidth: 5, color: speedColours[band]));
+        run = [route[i]];
+        band = b;
+      }
+    }
+    return out;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,15 +64,33 @@ class TripMap extends StatelessWidget {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'nz.mileagelog.app',
         ),
-        PolylineLayer(polylines: [
-          Polyline(points: route, strokeWidth: 4.5, color: cs.primary),
-        ]),
+        PolylineLayer(
+          polylines: speedsKmh != null && speedsKmh!.length == route.length
+              ? speedLines(route, speedsKmh!)
+              : [Polyline(points: route, strokeWidth: 4.5, color: cs.primary)],
+        ),
         MarkerLayer(markers: [
           Marker(point: route.first, width: 18, height: 18, child: _dot(Colors.green.shade700)),
           for (final l in lights) Marker(point: l.at, width: 14, height: 14, child: _light(l.stopped)),
           for (final s in stops) Marker(point: s, width: 24, height: 24, child: _stopPin(cs)),
           Marker(point: route.last, width: 18, height: 18, child: _dot(follow ? cs.primary : Colors.red.shade700)),
         ]),
+        if (speedsKmh != null)
+          Align(
+            alignment: Alignment.topLeft,
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.88), borderRadius: BorderRadius.circular(8)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Text('km/h ', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                for (var i = 0; i < speedColours.length; i++) ...[
+                  Container(width: 10, height: 10, color: speedColours[i]),
+                  Text(' ${speedBandLabel(i)}  ', style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                ],
+              ]),
+            ),
+          ),
         const RichAttributionWidget(attributions: [TextSourceAttribution('OpenStreetMap contributors')]),
       ],
     );
