@@ -61,7 +61,17 @@ class TripRecorder {
       }
       await setCar(null, null);
     }
-    await _ch.invokeMethod('setCars', {'addresses': [for (final c in settings.vehicleCars.values) c.address]});
+    await _ch.invokeMethod('setCars', {
+      'addresses': [for (final c in settings.vehicleCars.values) c.address],
+      'vehicles': {for (final e in settings.vehicleCars.entries) e.value.address: e.key},
+    });
+  }
+
+  /// The recorder notes the selected vehicle on every trip as it starts, so
+  /// a trip started from the widget or notification goes to the right car.
+  static Future<void> setActiveVehicle(String? id, String? name) async {
+    if (!supported) return;
+    await _ch.invokeMethod('setActiveVehicle', {'id': id, 'name': name});
   }
 
   /// Starts a manual trip after making sure the essentials are granted.
@@ -109,10 +119,12 @@ class TripRecorder {
       final existing = await repo.trip(id);
       final ended = meta['endAt'] != null || id != current;
       final carVehicle = settings?.vehicleForCar(meta['carAddress'] as String?);
-      final tripVehicle = existing?.vehicleId ?? carVehicle ?? vehicleId;
+      // Recorded at the start (since v0.18); only trusted if it still exists.
+      final metaVehicle = meta['vehicleId'] is String && await repo.vehicle(meta['vehicleId'] as String) != null ? meta['vehicleId'] as String : null;
+      final tripVehicle = chooseTripVehicle(saved: existing?.vehicleId, atStart: metaVehicle, byCar: carVehicle, selected: vehicleId);
 
       if (!ended) {
-        if (carVehicle != null && carVehicle != settings!.activeVehicleId) await settings.setActiveVehicleId(carVehicle);
+        if (carVehicle != null && carVehicle == tripVehicle && carVehicle != settings!.activeVehicleId) await settings.setActiveVehicleId(carVehicle);
         if (existing == null) {
           await repo.upsertTrip(TripsCompanion.insert(
             id: id,
@@ -181,6 +193,11 @@ class TripRecorder {
     return finished;
   }
 }
+
+/// Which vehicle a recorded trip belongs to: as already saved (it may have
+/// been moved), else the vehicle noted when recording started, else the one
+/// whose Bluetooth started it, else the one selected now.
+String chooseTripVehicle({String? saved, String? atStart, String? byCar, required String selected}) => saved ?? atStart ?? byCar ?? selected;
 
 /// Battery readings the recorder saved in a trip's meta file, for the
 /// trip's stats: {'battery': {'start': 82, 'end': 77, 'charging': false}}.

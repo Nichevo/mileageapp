@@ -166,7 +166,15 @@ class MainActivity : FlutterActivity() {
                 }
                 "setCars" -> {
                     val list = call.argument<List<String>>("addresses") ?: emptyList()
-                    prefs.edit().putString("carAddresses", org.json.JSONArray(list).toString()).apply()
+                    val owners = org.json.JSONObject()
+                    (call.argument<Map<String, String>>("vehicles") ?: emptyMap()).forEach { (address, vid) -> owners.put(address.uppercase(), vid) }
+                    prefs.edit().putString("carAddresses", org.json.JSONArray(list).toString())
+                        .putString("carVehicles", owners.toString()).apply()
+                    result.success(true)
+                }
+                "setActiveVehicle" -> {
+                    prefs.edit().putString("activeVehicleId", call.argument<String>("id"))
+                        .putString("activeVehicleName", call.argument<String>("name")).apply()
                     result.success(true)
                 }
                 "setAutoStart" -> {

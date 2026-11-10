@@ -11,6 +11,7 @@ import 'package:mileagelog/data/database.dart';
 import 'package:mileagelog/data/repository.dart';
 import 'package:mileagelog/domain/trip_stats.dart';
 import 'package:mileagelog/settings.dart';
+import 'package:mileagelog/trips/recorder.dart' show chooseTripVehicle;
 import 'package:mileagelog/ui/trip_detail_page.dart';
 import 'package:mileagelog/ui/vehicle_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'road_match_test.dart' show drive;
 
 void main() {
+  test('a trip keeps the vehicle noted when it started', () {
+    // Started in the loan car, app later switched back to my car.
+    expect(chooseTripVehicle(atStart: 'loan', selected: 'mine'), 'loan');
+    expect(chooseTripVehicle(byCar: 'ev', selected: 'mine'), 'ev');
+    expect(chooseTripVehicle(saved: 'moved', atStart: 'loan', selected: 'mine'), 'moved');
+    expect(chooseTripVehicle(selected: 'mine'), 'mine');
+  });
+
   test('each vehicle has its own Bluetooth, and one Bluetooth has one vehicle', () async {
     SharedPreferences.setMockInitialValues({});
     final s = await Settings.load();

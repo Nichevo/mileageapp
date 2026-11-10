@@ -403,7 +403,14 @@ class _TripsPageState extends State<TripsPage> {
           style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
           onPressed: _busy ? null : _start,
           icon: const Icon(Icons.play_arrow),
-          label: const Text('Start trip', style: TextStyle(fontSize: 16)),
+          label: StreamBuilder<List<Vehicle>>(
+            stream: AppScope.of(context).repo.watchVehicles(),
+            builder: (context, snap) {
+              final live = [for (final v in snap.data ?? const <Vehicle>[]) if (v.archivedAt == null) v];
+              final v = live.where((x) => x.id == AppScope.of(context).settings.activeVehicleId).firstOrNull;
+              return Text(v == null || live.length < 2 ? 'Start trip' : 'Start trip in ${v.name}', style: const TextStyle(fontSize: 16), overflow: TextOverflow.ellipsis);
+            },
+          ),
         ),
         const SizedBox(height: 6),
         Text(

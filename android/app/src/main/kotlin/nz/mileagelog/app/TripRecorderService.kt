@@ -75,6 +75,22 @@ class TripRecorderService : Service(), LocationListener {
             return out
         }
 
+        /**
+         * The vehicle a new trip belongs to: the one whose Bluetooth started
+         * it, else the one selected in the app when it started.
+         */
+        fun vehicleFor(ctx: Context, carAddress: String?): String? {
+            val p = prefs(ctx)
+            if (carAddress != null) {
+                try {
+                    val owners = JSONObject(p.getString("carVehicles", "{}") ?: "{}")
+                    val v = owners.optString(carAddress.uppercase(), "")
+                    if (v.isNotEmpty()) return v
+                } catch (_: Exception) {}
+            }
+            return p.getString("activeVehicleId", null)
+        }
+
         /** Car that started the trip in progress, or null for a manual trip. */
         fun currentCar(ctx: Context): String? = prefs(ctx).getString("currentCarAddress", null)
 
@@ -158,8 +174,17 @@ class TripRecorderService : Service(), LocationListener {
     }
 
     @SuppressLint("MissingPermission")
-    private fun startTrip(id: String, startedBy: String, carAddress: String? = null) {
+    private fun startTrip(id: String, startedBy: String, car: String? = null) {
         if (tripId == id) return
+        // Tapping "Connected to your car" starts a manual trip; it still
+        // belongs to that car if the tap came within 15 minutes.
+        var carAddress = car
+        if (carAddress == null && startedBy == "manual") {
+            val p = prefs(this)
+            val at = p.getLong("promptAt", 0L)
+            if (System.currentTimeMillis() - at < 15 * 60_000L) carAddress = p.getString("promptCar", null)
+            p.edit().remove("promptCar").remove("promptAt").apply()
+        }
         if (tripId != null) stopTrip(keepService = true)
 
         if (!goForeground("Starting…")) {
@@ -196,6 +221,7 @@ class TripRecorderService : Service(), LocationListener {
             startedAtMs = System.currentTimeMillis()
             val m = JSONObject().put("id", id).put("startAt", startedAtMs).put("startedBy", startedBy)
             if (carAddress != null) m.put("carAddress", carAddress)
+            vehicleFor(this, carAddress)?.let { m.put("vehicleId", it) }
             batteryPct()?.let { m.put("batteryStart", it) }
             if (isCharging()) m.put("charging", true)
             meta.writeText(m.toString())

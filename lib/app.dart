@@ -76,7 +76,22 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onOpen());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tellRecorderVehicle();
+      _onOpen();
+    });
+  }
+
+  /// Built again whenever the vehicle changes, so this keeps the recorder
+  /// (and the trip widget's label) on the selected vehicle.
+  Future<void> _tellRecorderVehicle() async {
+    if (!TripRecorder.supported || !mounted) return;
+    final scope = AppScope.of(context);
+    final id = scope.settings.activeVehicleId;
+    final v = id == null ? null : await scope.repo.vehicle(id);
+    try {
+      await TripRecorder.setActiveVehicle(id, v?.name);
+    } catch (_) {}
   }
 
   @override
@@ -122,6 +137,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     }
     try {
       await _handleLaunchAction();
+      await _tellRecorderVehicle();
       await TripRecorder.syncCars(scope.settings);
       await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!, settings: scope.settings);
       lookUpRecentTrips(scope.repo, scope.settings);

@@ -88,7 +88,8 @@ object HomeWidgets {
                     setTextViewText(R.id.widget_detail, String.format("%.1f km · %d min", km, mins))
                     setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_stop)
                 } else {
-                    setTextViewText(R.id.widget_title, "Start a trip")
+                    val vehicle = prefs.getString("activeVehicleName", null)
+                    setTextViewText(R.id.widget_title, if (vehicle.isNullOrEmpty()) "Start a trip" else "Start a trip · $vehicle")
                     setTextViewText(R.id.widget_detail, s.optString("trip", "Tap to record"))
                     setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_play)
                 }

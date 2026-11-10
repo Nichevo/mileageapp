@@ -52,6 +52,7 @@ class CarBluetoothReceiver : BroadcastReceiver() {
                     // Android can refuse to start location tracking from the
                     // background (battery optimisation on, or location not
                     // "Allow all the time"). Fall back to a one-tap prompt.
+                    prefs.edit().putString("promptCar", address).putLong("promptAt", System.currentTimeMillis()).apply()
                     promptToStart(ctx)
                 }
             }
