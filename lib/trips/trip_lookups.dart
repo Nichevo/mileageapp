@@ -9,6 +9,9 @@ import 'weather_lookup.dart';
 Future<void> lookUpRecentTrips(Repository repo, Settings settings) async {
   final vid = settings.activeVehicleId;
   if (vid == null) return;
+  try {
+    await RoadLookup.countLightCycles(repo); // older trips, once each, offline
+  } catch (_) {}
   if (settings.roadLookup) await RoadLookup.analyseRecent(repo, vid);
   if (settings.weatherLookup) await WeatherLookup.analyseRecent(repo, vid);
 }

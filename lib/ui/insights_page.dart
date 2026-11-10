@@ -8,10 +8,18 @@ import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/energy.dart';
+import '../domain/driving_stats.dart';
 import '../domain/ev_costs.dart';
+import '../domain/road_match.dart' show RoadClass, roadLabel;
 import '../domain/stats.dart';
+import '../domain/trip_stats.dart' show SpeedBand, bandLabel;
 import 'format.dart';
+import 'lights_page.dart';
+import 'route_compare_page.dart' show fmtMinSec;
+import 'trip_format.dart';
 import 'vehicle_page.dart' show VehicleChip;
+
+part 'insights_driving.dart';
 
 class InsightsPage extends StatefulWidget {
   const InsightsPage({super.key});
@@ -24,6 +32,8 @@ class _InsightsPageState extends State<InsightsPage> {
   Period _period = Period.month;
   bool _full = false; // show unusually big periods at full height
   String? _energyKind; // plug-in hybrids can switch between fuel and charging
+  List<Trip>? _factsSrc; // trips last parsed for Driving over time
+  List<TripFacts> _facts = const [];
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +83,8 @@ class _InsightsPageState extends State<InsightsPage> {
               List<_Bar> series(double? Function(PeriodTotals) f) => [
                 for (var i = 0; i < periods.length; i++) _Bar(_axisLabel(periods, i), _fullLabel(periods[i].start), f(periods[i]) ?? 0),
               ];
+              final gaps = [for (final g in fillGaps(allRows)) if (cutoff == null || !g.at.isBefore(cutoff)) g];
+              final gapsBy = fillGapsByPeriod(gaps, _period);
               final busiest = periods.isEmpty ? null : periods.reduce((a, b) => a.km >= b.km ? a : b);
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -138,6 +150,16 @@ class _InsightsPageState extends State<InsightsPage> {
                     caption: 'Average of the ${energy.nounPlural} made in each $unit. Empty bars had no ${energy.noun}.',
                     child: _bars(series((t) => t.pricePerUnit), cs.tertiary, decimals: 2, fit: !_full),
                   ),
+                  if (gapsBy.isNotEmpty)
+                    _ChartCard(
+                      title: 'Days between ${energy.nounPlural} · average per $unit',
+                      caption: gaps.isEmpty
+                          ? ''
+                          : 'Every ${(gaps.fold(0.0, (a, g) => a + g.days) / gaps.length).toStringAsFixed(1)} days and '
+                              '${fmtKm(gaps.fold(0.0, (a, g) => a + g.km) / gaps.length)} km on average. '
+                              'Each gap counts in the $unit of the later ${energy.noun}; empty bars had none.',
+                      child: _bars(series((t) => gapsBy[t.start]?.days), cs.secondary, decimals: 1, fit: !_full),
+                    ),
                   _ChartCard(
                     title: '${energy.isCharge ? 'Energy use' : 'Fuel economy'} · ${energy.per100}, rolling 5 ${energy.nounPlural}',
                     caption: 'Dashed line is the rolling average; dots are single ${energy.isCharge ? 'charges' : 'tanks'}',
@@ -165,6 +187,7 @@ class _InsightsPageState extends State<InsightsPage> {
                       decimals: 0,
                     ),
                   ),
+                  _drivingSection(vid, cutoff, unit),
                 ],
               );
             },
@@ -226,8 +249,9 @@ class _InsightsPageState extends State<InsightsPage> {
   );
 
   /// Label under every bar: 3-Nov, Nov-26, 2026.
-  String _axisLabel(List<PeriodTotals> ps, int i) {
-    final d = ps[i].start;
+  String _axisLabel(List<PeriodTotals> ps, int i) => _labelAt(ps[i].start);
+
+  String _labelAt(DateTime d) {
     return switch (_period) {
       Period.week => DateFormat('d-MMM').format(d),
       Period.month => DateFormat('MMM-yy').format(d),

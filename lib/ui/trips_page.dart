@@ -39,9 +39,12 @@ class _TripsPageState extends State<TripsPage> {
   TripSize _size = TripSize.any;
   final _selected = <String>{};
   String? _placeId; // filter: trips starting or ending here
+  bool _allVehicles = false;
+
   /// Start and end of every recorded trip, for place names.
   Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})> _allEnds = const {};
   String _endsKey = '';
+
   /// First and last points of trips that might be merged, loaded on demand.
   final _ends = <String, ({({double lat, double lon}) from, ({double lat, double lon}) to})?>{};
 
@@ -158,71 +161,96 @@ class _TripsPageState extends State<TripsPage> {
   }
 
   Widget _list(AppScope scope) {
-    return StreamBuilder<List<Trip>>(
-      stream: scope.repo.watchTrips(scope.settings.activeVehicleId!),
-      builder: (context, snap) {
-        final trips = (snap.data ?? const <Trip>[]).where((t) => t.status != 'recording' || t.id == _currentId).toList();
-        final done = trips.where((t) => t.status == 'done').toList();
-        final byId = {for (final t in trips) t.id: t};
-        final rows = filterTrips(
-          [for (final t in trips) if (t.id != _currentId) _row(t)],
-          sort: _sort,
-          period: _period,
-          size: _size,
-          now: DateTime.now(),
-        );
-        final suggestions = _suggestions(scope, done);
-        _loadEnds(scope, trips);
-        final places = scope.settings.places;
-        if (_placeId != null && places.every((p) => p.id != _placeId)) _placeId = null;
-        if (_placeId != null) {
-          rows.removeWhere((r) {
-            final e = _allEnds[r.id];
-            return e == null || (placeAt(e.from, places)?.id != _placeId && placeAt(e.to, places)?.id != _placeId);
-          });
-        }
-        final newPlace = _placeSuggestion(scope, places);
-        final filtered = _period != TripPeriod.all || _size != TripSize.any || _placeId != null;
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            if (_selected.isEmpty) ...[
-              if (!TripRecorder.supported)
-                const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Trip recording works on the Android app.')))
-              else if (_currentId != null)
-                _liveCard(context)
-              else
-                _startCard(context),
-              const SizedBox(height: 16),
-              if (done.isNotEmpty) _yearSummary(context, done),
-              for (final (a, b) in suggestions)
-                if (byId[a] != null && byId[b] != null) _suggestionCard(context, scope, byId[a]!, byId[b]!),
-              if (newPlace != null) _placeCard(context, scope, newPlace),
-            ] else
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('Tap trips to select them. Merging joins them into one trip, with the time between them as a stop.',
-                    style: Theme.of(context).textTheme.bodySmall),
-              ),
-            const SizedBox(height: 8),
-            if (trips.isNotEmpty) _filterBar(context, places),
-            if (trips.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('No trips yet. Start one above, or set up auto-start so trips record themselves when the phone connects to the car.', textAlign: TextAlign.center),
-              )
-            else if (rows.isEmpty)
-              const Padding(padding: EdgeInsets.all(24), child: Text('No trips match these filters.', textAlign: TextAlign.center))
-            else if (filtered)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '${rows.length} trip${rows.length == 1 ? '' : 's'} · ${fmtKm(rows.fold(0.0, (a, r) => a + (r.km ?? 0)))} km',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            for (final r in rows) _tripTile(context, byId[r.id]!),
-          ],
+    final vid = scope.settings.activeVehicleId!;
+    return StreamBuilder<List<Vehicle>>(
+      stream: scope.repo.watchVehicles(),
+      builder: (context, vsnap) {
+        final vehicles = {for (final v in vsnap.data ?? const <Vehicle>[]) v.id: v};
+        if (vehicles.length < 2) _allVehicles = false;
+        return StreamBuilder<List<Trip>>(
+          // Keyed so switching between one and all vehicles starts a new stream.
+          key: ValueKey(_allVehicles),
+          stream: scope.repo.watchTrips(_allVehicles ? null : vid),
+          builder: (context, snap) {
+            final trips = (snap.data ?? const <Trip>[]).where((t) => t.status != 'recording' || t.id == _currentId).toList();
+            final done = trips.where((t) => t.status == 'done').toList();
+            // Merging only makes sense within one vehicle: suggest it for this one.
+            final ownDone = done.where((t) => t.vehicleId == vid).toList();
+            final byId = {for (final t in trips) t.id: t};
+            final rows = filterTrips(
+              [
+                for (final t in trips)
+                  if (t.id != _currentId) _row(t),
+              ],
+              sort: _sort,
+              period: _period,
+              size: _size,
+              now: DateTime.now(),
+            );
+            final suggestions = _suggestions(scope, ownDone);
+            _loadEnds(scope, trips);
+            final places = scope.settings.places;
+            if (_placeId != null && places.every((p) => p.id != _placeId)) _placeId = null;
+            if (_placeId != null) {
+              rows.removeWhere((r) {
+                final e = _allEnds[r.id];
+                return e == null || (placeAt(e.from, places)?.id != _placeId && placeAt(e.to, places)?.id != _placeId);
+              });
+            }
+            final newPlace = _placeSuggestion(scope, places);
+            final filtered = _period != TripPeriod.all || _size != TripSize.any || _placeId != null;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                if (_selected.isEmpty) ...[
+                  if (!TripRecorder.supported)
+                    const Card(
+                      child: Padding(padding: EdgeInsets.all(16), child: Text('Trip recording works on the Android app.')),
+                    )
+                  else if (_currentId != null)
+                    _liveCard(context)
+                  else
+                    _startCard(context),
+                  const SizedBox(height: 16),
+                  if (done.isNotEmpty) _yearSummary(context, done, all: _allVehicles),
+                  for (final (a, b) in suggestions)
+                    if (byId[a] != null && byId[b] != null) _suggestionCard(context, scope, byId[a]!, byId[b]!),
+                  if (newPlace != null) _placeCard(context, scope, newPlace),
+                ] else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Tap trips to select them. Merging joins them into one trip, with the time between them as a stop.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                if (trips.isNotEmpty || _allVehicles || vehicles.length > 1) _filterBar(context, places, vehicles.length > 1),
+                if (trips.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'No trips yet. Start one above, or set up auto-start so trips record themselves when the phone connects to the car.',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                else if (rows.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('No trips match these filters.', textAlign: TextAlign.center),
+                  )
+                else if (filtered)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${rows.length} trip${rows.length == 1 ? '' : 's'} · ${fmtKm(rows.fold(0.0, (a, r) => a + (r.km ?? 0)))} km',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                for (final r in rows) _tripTile(context, byId[r.id]!, vehicle: _allVehicles ? vehicles[byId[r.id]!.vehicleId] : null),
+              ],
+            );
+          },
         );
       },
     );
@@ -230,10 +258,10 @@ class _TripsPageState extends State<TripsPage> {
 
   /// Loads trip ends again when the set of trips changes.
   void _loadEnds(AppScope scope, List<Trip> trips) {
-    final key = '${trips.length}:${trips.where((t) => t.status == 'done').map((t) => t.id).join(',').hashCode}';
+    final key = '$_allVehicles:${trips.length}:${trips.where((t) => t.status == 'done').map((t) => t.id).join(',').hashCode}';
     if (key == _endsKey) return;
     _endsKey = key;
-    scope.repo.allTripEnds(scope.settings.activeVehicleId!).then((e) {
+    scope.repo.allTripEnds(_allVehicles ? null : scope.settings.activeVehicleId!).then((e) {
       if (mounted) setState(() => _allEnds = e);
     });
   }
@@ -248,9 +276,9 @@ class _TripsPageState extends State<TripsPage> {
   ({LatLon at, int count})? _placeSuggestion(AppScope scope, List<Place> places) {
     if (_allEnds.isEmpty) return null;
     final dismissed = scope.settings.dismissedPlaces.toSet();
-    return suggestPlaces([for (final e in _allEnds.values) ...[e.from, e.to]], places)
-        .where((s) => !dismissed.contains(_placeKey(s.at)))
-        .firstOrNull;
+    return suggestPlaces([
+      for (final e in _allEnds.values) ...[e.from, e.to],
+    ], places).where((s) => !dismissed.contains(_placeKey(s.at))).firstOrNull;
   }
 
   static String _placeKey(LatLon p) => '${p.lat.toStringAsFixed(3)},${p.lon.toStringAsFixed(3)}';
@@ -267,58 +295,76 @@ class _TripsPageState extends State<TripsPage> {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(height: 140, child: TripMap(route: [LatLng(s.at.lat, s.at.lon)], follow: true)),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Name this place?', style: t.titleSmall),
-            Text('${s.count} trips start or end here. Named places give trips titles like "Home → Work", and stay on this phone.', style: t.bodySmall),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 4, children: [
-              for (final n in ['Home', 'Work'])
-                if (!taken.contains(n)) ActionChip(label: Text(n), onPressed: () => name(n)),
-              ActionChip(label: const Text('Other name…'), onPressed: () => name(null)),
-              TextButton(
-                onPressed: () async {
-                  await scope.settings.dismissPlace(_placeKey(s.at));
-                  setState(() {});
-                },
-                child: const Text('Not now'),
-              ),
-            ]),
-          ]),
-        ),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: 140, child: TripMap(route: [LatLng(s.at.lat, s.at.lon)], follow: true)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Name this place?', style: t.titleSmall),
+                Text('${s.count} trips start or end here. Named places give trips titles like "Home → Work", and stay on this phone.', style: t.bodySmall),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final n in ['Home', 'Work'])
+                      if (!taken.contains(n)) ActionChip(label: Text(n), onPressed: () => name(n)),
+                    ActionChip(label: const Text('Other name…'), onPressed: () => name(null)),
+                    TextButton(
+                      onPressed: () async {
+                        await scope.settings.dismissPlace(_placeKey(s.at));
+                        setState(() {});
+                      },
+                      child: const Text('Not now'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _filterBar(BuildContext context, List<Place> places) {
-    Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, {bool highlight = false}) =>
-        PopupMenuButton<T>(
-          initialValue: value,
-          onSelected: (v) => setState(() => set(v)),
-          itemBuilder: (_) => [for (final v in values) PopupMenuItem(value: v, child: Text(label(v)))],
-          child: Chip(
-            avatar: Icon(icon, size: 18),
-            label: Text(label(value)),
-            backgroundColor: highlight ? Theme.of(context).colorScheme.secondaryContainer : null,
+  Widget _filterBar(BuildContext context, List<Place> places, bool manyVehicles) {
+    Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, {bool highlight = false}) => PopupMenuButton<T>(
+      initialValue: value,
+      onSelected: (v) => setState(() => set(v)),
+      itemBuilder: (_) => [for (final v in values) PopupMenuItem(value: v, child: Text(label(v)))],
+      child: Chip(
+        avatar: Icon(icon, size: 18),
+        label: Text(label(value)),
+        backgroundColor: highlight ? Theme.of(context).colorScheme.secondaryContainer : null,
+      ),
+    );
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        if (manyVehicles)
+          menu<bool>(Icons.directions_car_outlined, _allVehicles, const [false, true], (a) => a ? 'All vehicles' : 'This vehicle', (v) {
+            _allVehicles = v;
+            _selected.clear();
+          }, highlight: _allVehicles),
+        menu(Icons.sort, _sort, TripSort.values, tripSortLabel, (v) => _sort = v),
+        menu(Icons.date_range, _period, TripPeriod.values, tripPeriodLabel, (v) => _period = v, highlight: _period != TripPeriod.all),
+        menu(Icons.straighten, _size, TripSize.values, tripSizeLabel, (v) => _size = v, highlight: _size != TripSize.any),
+        if (places.isNotEmpty)
+          menu<String>(
+            Icons.place_outlined,
+            _placeId ?? '',
+            ['', ...places.map((p) => p.id)],
+            (id) => id.isEmpty ? 'Any place' : places.firstWhere((p) => p.id == id).name,
+            (v) => _placeId = v.isEmpty ? null : v,
+            highlight: _placeId != null,
           ),
-        );
-    return Wrap(spacing: 8, runSpacing: 4, children: [
-      menu(Icons.sort, _sort, TripSort.values, tripSortLabel, (v) => _sort = v),
-      menu(Icons.date_range, _period, TripPeriod.values, tripPeriodLabel, (v) => _period = v, highlight: _period != TripPeriod.all),
-      menu(Icons.straighten, _size, TripSize.values, tripSizeLabel, (v) => _size = v, highlight: _size != TripSize.any),
-      if (places.isNotEmpty)
-        menu<String>(
-          Icons.place_outlined,
-          _placeId ?? '',
-          ['', ...places.map((p) => p.id)],
-          (id) => id.isEmpty ? 'Any place' : places.firstWhere((p) => p.id == id).name,
-          (v) => _placeId = v.isEmpty ? null : v,
-          highlight: _placeId != null,
-        ),
-    ]);
+      ],
+    );
   }
 
   /// Recent trips that look like one journey split in two. Their end points
@@ -328,7 +374,9 @@ class _TripsPageState extends State<TripsPage> {
     final recent = done.where((t) => t.startAt.isAfter(since) && t.statsJson != null).toList();
     final byTime = mergeSuggestions([for (final t in recent) _row(t)]);
     final dismissed = scope.settings.dismissedMerges.toSet();
-    final missing = {for (final (a, b) in byTime) ...[a, b]}.where((id) => !_ends.containsKey(id)).toList();
+    final missing = {
+      for (final (a, b) in byTime) ...[a, b],
+    }.where((id) => !_ends.containsKey(id)).toList();
     if (missing.isNotEmpty) {
       for (final id in missing) {
         _ends[id] = null;
@@ -338,10 +386,9 @@ class _TripsPageState extends State<TripsPage> {
       });
       return const [];
     }
-    return mergeSuggestions([for (final t in recent) _row(t)])
-        .where((p) => _ends[p.$1] != null && _ends[p.$2] != null && !dismissed.contains('${p.$1}+${p.$2}'))
-        .take(3)
-        .toList();
+    return mergeSuggestions([
+      for (final t in recent) _row(t),
+    ]).where((p) => _ends[p.$1] != null && _ends[p.$2] != null && !dismissed.contains('${p.$1}+${p.$2}')).take(3).toList();
   }
 
   Widget _suggestionCard(BuildContext context, AppScope scope, Trip a, Trip b) {
@@ -350,21 +397,27 @@ class _TripsPageState extends State<TripsPage> {
       color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('One journey in two parts?', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text('"${a.name}" and "${b.name}"${gap == null ? '' : ' are ${fmtDuration(gap)} apart'}, and the second starts where the first ended.'),
-          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            TextButton(
-              onPressed: () async {
-                await scope.settings.dismissMerge('${a.id}+${b.id}');
-                setState(() {});
-              },
-              child: const Text('Keep separate'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('One journey in two parts?', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text('"${a.name}" and "${b.name}"${gap == null ? '' : ' are ${fmtDuration(gap)} apart'}, and the second starts where the first ended.'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    await scope.settings.dismissMerge('${a.id}+${b.id}');
+                    setState(() {});
+                  },
+                  child: const Text('Keep separate'),
+                ),
+                FilledButton.tonal(onPressed: () => _merge([a.id, b.id]), child: const Text('Merge')),
+              ],
             ),
-            FilledButton.tonal(onPressed: () => _merge([a.id, b.id]), child: const Text('Merge')),
-          ]),
-        ]),
+          ],
+        ),
       ),
     );
   }
@@ -388,6 +441,12 @@ class _TripsPageState extends State<TripsPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only recorded trips can be merged')));
       return;
     }
+    if (trips.map((t) => t!.vehicleId).toSet().length > 1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('These trips are in different vehicles. Move them to one vehicle first.')));
+      }
+      return;
+    }
     await scope.repo.mergeTrips(ids);
     lookUpRecentTrips(scope.repo, scope.settings);
     if (mounted) setState(_selected.clear);
@@ -406,9 +465,16 @@ class _TripsPageState extends State<TripsPage> {
           label: StreamBuilder<List<Vehicle>>(
             stream: AppScope.of(context).repo.watchVehicles(),
             builder: (context, snap) {
-              final live = [for (final v in snap.data ?? const <Vehicle>[]) if (v.archivedAt == null) v];
+              final live = [
+                for (final v in snap.data ?? const <Vehicle>[])
+                  if (v.archivedAt == null) v,
+              ];
               final v = live.where((x) => x.id == AppScope.of(context).settings.activeVehicleId).firstOrNull;
-              return Text(v == null || live.length < 2 ? 'Start trip' : 'Start trip in ${v.name}', style: const TextStyle(fontSize: 16), overflow: TextOverflow.ellipsis);
+              return Text(
+                v == null || live.length < 2 ? 'Start trip' : 'Start trip in ${v.name}',
+                style: const TextStyle(fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              );
             },
           ),
         ),
@@ -426,7 +492,10 @@ class _TripsPageState extends State<TripsPage> {
 
   Widget _liveCard(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final route = [for (final s in _live) if ((s.accuracyM ?? 0) <= maxAccuracyM) LatLng(s.lat, s.lon)];
+    final route = [
+      for (final s in _live)
+        if ((s.accuracyM ?? 0) <= maxAccuracyM) LatLng(s.lat, s.lon),
+    ];
     final km = liveDistanceKm(_live);
     final start = _live.isNotEmpty ? _live.first.at : null;
     final elapsed = start == null ? Duration.zero : DateTime.now().difference(start);
@@ -442,26 +511,20 @@ class _TripsPageState extends State<TripsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  Icon(Icons.fiber_manual_record, color: Colors.red.shade600, size: 14),
-                  const SizedBox(width: 6),
-                  Text('Recording', style: t.labelLarge),
-                ]),
+                Row(
+                  children: [
+                    Icon(Icons.fiber_manual_record, color: Colors.red.shade600, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Recording', style: t.labelLarge),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _figure(t, '${fmtKm1(km)} km', 'distance'),
-                    _figure(t, fmtDuration(elapsed), 'elapsed'),
-                    _figure(t, fmtKmh(speed), 'now'),
-                  ],
+                  children: [_figure(t, '${fmtKm1(km)} km', 'distance'), _figure(t, fmtDuration(elapsed), 'elapsed'), _figure(t, fmtKmh(speed), 'now')],
                 ),
                 const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _stop,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop trip'),
-                ),
+                FilledButton.tonalIcon(onPressed: _busy ? null : _stop, icon: const Icon(Icons.stop), label: const Text('Stop trip')),
                 const SizedBox(height: 4),
                 Text('Recording carries on with the screen off. You can also stop it from the notification.', style: t.bodySmall),
               ],
@@ -473,11 +536,14 @@ class _TripsPageState extends State<TripsPage> {
   }
 
   Widget _figure(TextTheme t, String value, String label) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Text(value, style: t.titleLarge), Text(label, style: t.bodySmall)],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(value, style: t.titleLarge),
+      Text(label, style: t.bodySmall),
+    ],
+  );
 
-  Widget _yearSummary(BuildContext context, List<Trip> done) {
+  Widget _yearSummary(BuildContext context, List<Trip> done, {bool all = false}) {
     final t = Theme.of(context).textTheme;
     final year = DateTime.now().year;
     var km = 0.0;
@@ -498,7 +564,7 @@ class _TripsPageState extends State<TripsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Recorded in $year', style: t.labelLarge),
+            Text('Recorded in $year${all ? ', all vehicles' : ''}', style: t.labelLarge),
             const SizedBox(height: 4),
             Text('$n trips · ${fmtKm(km)} km · ${fmtDuration(moving)} moving', style: t.titleMedium),
             const SizedBox(height: 12),
@@ -509,12 +575,13 @@ class _TripsPageState extends State<TripsPage> {
     );
   }
 
-  Widget _tripTile(BuildContext context, Trip trip) {
+  Widget _tripTile(BuildContext context, Trip trip, {Vehicle? vehicle}) {
     final s = trip.statsJson == null ? null : TripStats.fromJson(jsonDecode(trip.statsJson!) as Map<String, Object?>);
     final odoKm = trip.startOdometerKm != null && trip.endOdometerKm != null ? trip.endOdometerKm! - trip.startOdometerKm! : null;
     final km = s?.distanceKm ?? trip.gpsDistanceKm ?? odoKm;
     final road = RoadLookup.stored(trip.statsJson);
     final parts = <String>[
+      ?vehicle?.name,
       fmtDate(trip.startAt),
       if (km != null) '${fmtKm1(km)} km',
       if (s != null) fmtDuration(s.total),
@@ -529,11 +596,13 @@ class _TripsPageState extends State<TripsPage> {
       contentPadding: EdgeInsets.zero,
       selected: selected,
       leading: CircleAvatar(
-        child: Icon(selected
-            ? Icons.check
-            : trip.status == 'report'
-                ? Icons.description_outlined
-                : (trip.startedBy == 'bluetooth' ? Icons.bluetooth : Icons.route)),
+        child: Icon(
+          selected
+              ? Icons.check
+              : trip.status == 'report'
+              ? Icons.description_outlined
+              : (trip.startedBy == 'bluetooth' ? Icons.bluetooth : Icons.route),
+        ),
       ),
       title: Text(_title(trip, AppScope.of(context).settings.places)),
       subtitle: Text(parts.join(' · ')),
@@ -552,10 +621,10 @@ class BandBar extends StatelessWidget {
   const BandBar({super.key, required this.bandKm});
 
   static Color colorFor(SpeedBand b, ColorScheme cs) => switch (b) {
-        SpeedBand.urban => cs.tertiary,
-        SpeedBand.openRoad => cs.primary,
-        SpeedBand.motorway => cs.secondary,
-      };
+    SpeedBand.urban => cs.tertiary,
+    SpeedBand.openRoad => cs.primary,
+    SpeedBand.motorway => cs.secondary,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -570,22 +639,38 @@ class BandBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: SizedBox(
             height: 14,
-            child: Row(children: [
-              for (final b in SpeedBand.values)
-                if ((shares[b] ?? 0) > 0)
-                  Expanded(flex: ((shares[b] ?? 0) * 1000).round().clamp(1, 1000), child: Container(color: colorFor(b, cs))),
-            ]),
+            child: Row(
+              children: [
+                for (final b in SpeedBand.values)
+                  if ((shares[b] ?? 0) > 0)
+                    Expanded(
+                      flex: ((shares[b] ?? 0) * 1000).round().clamp(1, 1000),
+                      child: Container(color: colorFor(b, cs)),
+                    ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Wrap(spacing: 14, runSpacing: 4, children: [
-          for (final b in SpeedBand.values)
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(color: colorFor(b, cs), borderRadius: BorderRadius.circular(2))),
-              const SizedBox(width: 4),
-              Text('${bandLabel(b)} ${((shares[b] ?? 0) * 100).round()}% · ${fmtKm(bandKm[b] ?? 0)} km', style: t.bodySmall),
-            ]),
-        ]),
+        Wrap(
+          spacing: 14,
+          runSpacing: 4,
+          children: [
+            for (final b in SpeedBand.values)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: colorFor(b, cs), borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(width: 4),
+                  Text('${bandLabel(b)} ${((shares[b] ?? 0) * 100).round()}% · ${fmtKm(bandKm[b] ?? 0)} km', style: t.bodySmall),
+                ],
+              ),
+          ],
+        ),
       ],
     );
   }

@@ -355,9 +355,10 @@ class Repository {
 
   // ---- trips -------------------------------------------------------------
 
-  Stream<List<Trip>> watchTrips(String vehicleId) =>
+  /// A vehicle's trips, newest first; every vehicle's when [vehicleId] is null.
+  Stream<List<Trip>> watchTrips(String? vehicleId) =>
       (db.select(db.trips)
-            ..where((t) => t.vehicleId.equals(vehicleId))
+            ..where((t) => vehicleId == null ? const Constant(true) : t.vehicleId.equals(vehicleId))
             ..orderBy([(t) => OrderingTerm.desc(t.startAt)]))
           .watch();
 
@@ -416,11 +417,11 @@ class Repository {
   }
 
   /// First and last GPS point of every recorded trip of a vehicle.
-  Future<Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})>> allTripEnds(String vehicleId) async {
+  Future<Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})>> allTripEnds(String? vehicleId) async {
     final rows = await db.customSelect(
       'SELECT p.trip_id AS id, MIN(p.seq) AS first, MAX(p.seq) AS last FROM trip_points p '
-      'JOIN trips t ON t.id = p.trip_id WHERE t.vehicle_id = ? GROUP BY p.trip_id',
-      variables: [Variable.withString(vehicleId)],
+      'JOIN trips t ON t.id = p.trip_id ${vehicleId == null ? '' : 'WHERE t.vehicle_id = ? '}GROUP BY p.trip_id',
+      variables: [if (vehicleId != null) Variable.withString(vehicleId)],
       readsFrom: {db.tripPoints, db.trips},
     ).get();
     if (rows.isEmpty) return {};

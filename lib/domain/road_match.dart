@@ -93,7 +93,14 @@ class OsmArea {
 class LightPass {
   final double lat, lon;
   final bool stopped;
-  const LightPass(this.lat, this.lon, this.stopped);
+  /// Time held up on the approach, first stop to moving off the last one.
+  /// Null on trips analysed before cycles were counted.
+  final int? waitS;
+  /// Red phases waited through: 0 straight through, 1 one red, 2+ when you
+  /// moved up in the queue and stopped again (missed a green).
+  final int? phases;
+  const LightPass(this.lat, this.lon, this.stopped, {this.waitS, this.phases});
+  bool get counted => phases != null;
 }
 
 class RoadStats {
@@ -105,11 +112,20 @@ class RoadStats {
 
   int get lightsPassed => lights.length;
   int get stoppedAtLights => lights.where((l) => l.stopped).length;
+  bool get cyclesCounted => lights.isNotEmpty && lights.every((l) => l.counted);
+  int get redPhases => lights.fold(0, (a, l) => a + (l.phases ?? (l.stopped ? 1 : 0)));
+  int get multiPhaseLights => lights.where((l) => (l.phases ?? 0) >= 2).length;
 
   Map<String, Object?> toJson() => {
         'roadKm': {for (final e in roadKm.entries) e.key.name: double.parse(e.value.toStringAsFixed(3))},
         'lights': [
-          for (final l in lights) [double.parse(l.lat.toStringAsFixed(5)), double.parse(l.lon.toStringAsFixed(5)), l.stopped ? 1 : 0],
+          for (final l in lights)
+            [
+              double.parse(l.lat.toStringAsFixed(5)),
+              double.parse(l.lon.toStringAsFixed(5)),
+              l.stopped ? 1 : 0,
+              if (l.counted) ...[l.waitS ?? 0, l.phases],
+            ],
         ],
         'waitS': waitAtLights.inSeconds,
         if (tolls.isNotEmpty) 'tolls': [for (final t in tolls) [t.name, double.parse(t.km.toStringAsFixed(2))]],
@@ -124,7 +140,14 @@ class RoadStats {
       },
       lights: [
         for (final l in (j['lights'] as List? ?? const []))
-          if (l is List && l.length >= 3) LightPass((l[0] as num).toDouble(), (l[1] as num).toDouble(), l[2] == 1),
+          if (l is List && l.length >= 3)
+            LightPass(
+              (l[0] as num).toDouble(),
+              (l[1] as num).toDouble(),
+              l[2] == 1,
+              waitS: l.length >= 5 ? (l[3] as num).toInt() : null,
+              phases: l.length >= 5 ? (l[4] as num).toInt() : null,
+            ),
       ],
       waitAtLights: Duration(seconds: (j['waitS'] as num?)?.toInt() ?? 0),
       tolls: [
@@ -142,6 +165,10 @@ const double signalClusterM = 45; // signal nodes this close are one intersectio
 const double lightOnRouteM = 25; // route passes this close to a signal node
 const double lightStopM = 50; // a stop this close to an intersection waited at it
 const Duration lightStopMax = Duration(minutes: 5);
+const double lightQueueM = 150; // a queue for a light can reach back this far
+const double lightPassM = 40; // the route came this close to the light
+const Duration redPhaseMin = Duration(seconds: 15); // a stop this long is a red
+const double queueMoveM = 12; // moving up this far between stops: a green went by
 
 // ---- geometry in local metres ----
 const _mPerDegLat = 110574.0;
@@ -273,41 +300,14 @@ RoadStats matchRoads(List<GpsSample> raw, OsmArea osm) {
     if (onRoute) passed.add(c);
   }
 
-  // Stops (short and long) near an intersection that was passed.
-  final stats = computeTripStats(raw);
-  final stoppedAt = <int>{};
-  var wait = Duration.zero;
-  for (final span in [...stats.shortStopSpans, ...stats.stops]) {
-    if (span.duration > lightStopMax) continue;
-    final p = (lat: span.lat, lon: span.lon);
-    var bestI = -1;
-    var bestD = double.infinity;
-    for (var i = 0; i < passed.length; i++) {
-      for (final s in passed[i]) {
-        final d = metresBetween(p, s);
-        if (d <= lightStopM && d < bestD) {
-          bestD = d;
-          bestI = i;
-        }
-      }
-    }
-    if (bestI >= 0) {
-      stoppedAt.add(bestI);
-      wait += span.duration;
-    }
-  }
+  final lights = lightWaits(raw, [
+    for (final c in passed) (lat: c.map((s) => s.lat).reduce((a, b) => a + b) / c.length, lon: c.map((s) => s.lon).reduce((a, b) => a + b) / c.length),
+  ]);
 
   return RoadStats(
     roadKm: roadKm,
-    lights: [
-      for (var i = 0; i < passed.length; i++)
-        LightPass(
-          passed[i].map((s) => s.lat).reduce((a, b) => a + b) / passed[i].length,
-          passed[i].map((s) => s.lon).reduce((a, b) => a + b) / passed[i].length,
-          stoppedAt.contains(i),
-        ),
-    ],
-    waitAtLights: wait,
+    lights: lights,
+    waitAtLights: Duration(seconds: lights.fold(0, (a, l) => a + (l.waitS ?? 0))),
     tolls: [
       for (final e in tollKm.entries)
         if (e.value >= tollMinKm) TollUse(e.key, e.value),
@@ -379,4 +379,75 @@ Map<RoadClass, double> roadShares(Map<RoadClass, double> km) {
   final total = km.values.fold(0.0, (a, b) => a + b);
   if (total <= 0) return const {};
   return {for (final e in km.entries) e.key: e.value / total};
+}
+
+/// How long you were held up at each light and how many red phases that
+/// took. Stops on the approach (up to [lightQueueM] back, before passing the
+/// light) belong to the next light ahead. Each stop of [redPhaseMin] or more
+/// after moving up at least [queueMoveM] is another red: the queue moved on
+/// a green but you didn't get through. The signal itself isn't known, so it
+/// is an estimate.
+List<LightPass> lightWaits(List<GpsSample> raw, List<LL> lights) {
+  final pts = _clean(raw);
+  if (lights.isEmpty) return const [];
+  final stats = computeTripStats(raw);
+  // When the route passed each light.
+  final passAt = <DateTime?>[
+    for (final l in lights)
+      () {
+        DateTime? at;
+        var best = lightPassM;
+        for (final p in pts) {
+          final d = metresBetween((lat: p.lat, lon: p.lon), l);
+          if (d <= best) {
+            best = d;
+            at = p.at;
+          }
+        }
+        return at;
+      }(),
+  ];
+  final spans = [...stats.shortStopSpans, ...stats.stops]..sort((a, b) => a.arrive.compareTo(b.arrive));
+  final byLight = <int, List<StopSpan>>{};
+  for (final span in spans) {
+    if (span.duration > lightStopMax) continue;
+    final p = (lat: span.lat, lon: span.lon);
+    int? best;
+    var bestKey = double.infinity;
+    for (var i = 0; i < lights.length; i++) {
+      final d = metresBetween(p, lights[i]);
+      final at = passAt[i];
+      if (at == null) {
+        if (d <= lightStopM && d < bestKey) {
+          bestKey = d;
+          best = i;
+        }
+        continue;
+      }
+      if (d > lightQueueM) continue;
+      // Stopped before reaching it, and got there soon after moving off.
+      final lead = at.difference(span.depart);
+      if (span.arrive.isAfter(at.add(const Duration(seconds: 5))) || lead > const Duration(minutes: 3)) continue;
+      // The next light ahead wins; distance breaks ties.
+      final key = lead.inSeconds.toDouble() + d / 1000;
+      if (key < bestKey) {
+        bestKey = key;
+        best = i;
+      }
+    }
+    if (best != null) (byLight[best] ??= []).add(span);
+  }
+  return [
+    for (var i = 0; i < lights.length; i++)
+      () {
+        final s = byLight[i] ?? const <StopSpan>[];
+        if (s.isEmpty) return LightPass(lights[i].lat, lights[i].lon, false, waitS: 0, phases: 0);
+        var phases = 1;
+        for (var k = 1; k < s.length; k++) {
+          final moved = metresBetween((lat: s[k - 1].lat, lon: s[k - 1].lon), (lat: s[k].lat, lon: s[k].lon));
+          if (moved >= queueMoveM && s[k].duration >= redPhaseMin) phases++;
+        }
+        return LightPass(lights[i].lat, lights[i].lon, true, waitS: s.last.depart.difference(s.first.arrive).inSeconds, phases: phases);
+      }(),
+  ];
 }

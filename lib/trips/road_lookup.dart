@@ -70,6 +70,34 @@ class RoadLookup {
     return road;
   }
 
+  /// Counts red phases at each light for trips analysed before that was
+  /// added, from the stored light positions and the trip's own points, with
+  /// no network. Also re-counts when [force] (after merging trips).
+  static Future<int> countLightCycles(Repository repo, {String? tripId, bool force = false}) async {
+    final trips = tripId == null ? await repo.db.select(repo.db.trips).get() : [?(await repo.trip(tripId))];
+    var n = 0;
+    for (final t in trips) {
+      final road = stored(t.statsJson);
+      if (road == null || road.lights.isEmpty || (road.cyclesCounted && !force)) continue;
+      final pts = await repo.tripPoints(t.id);
+      if (pts.length < 2) continue; // nothing to measure against
+      final samples = [for (final p in pts) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM)];
+      final lights = lightWaits(samples, [for (final l in road.lights) (lat: l.lat, lon: l.lon)]);
+      final updated = RoadStats(
+        roadKm: road.roadKm,
+        lights: lights,
+        waitAtLights: Duration(seconds: lights.fold(0, (a, l) => a + (l.waitS ?? 0))),
+        tolls: road.tolls,
+      );
+      final fresh = await repo.trip(t.id);
+      final stats = jsonDecode(fresh!.statsJson!) as Map<String, Object?>;
+      stats['road'] = updated.toJson();
+      await repo.setTripStatsJson(t.id, jsonEncode(stats));
+      n++;
+    }
+    return n;
+  }
+
   /// Looks up recent finished trips that don't have road stats yet. Quiet:
   /// failures are left for next time (or the trip page).
   static bool _busy = false;

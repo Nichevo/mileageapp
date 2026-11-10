@@ -199,7 +199,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                             for (final p in _accurate) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM),
                           ]),
                           stops: [for (final s in _stops) if (s.lat != null) LatLng(s.lat!, s.lon!)],
-                          lights: [for (final l in road?.lights ?? const <LightPass>[]) (at: LatLng(l.lat, l.lon), stopped: l.stopped)],
+                          lights: [for (final l in road?.lights ?? const <LightPass>[]) (at: LatLng(l.lat, l.lon), stopped: l.stopped, phases: l.phases ?? (l.stopped ? 1 : 0))],
                         ),
                       ),
                     Padding(
@@ -508,7 +508,8 @@ class _TripDetailPageState extends State<TripDetailPage> {
       ('Longer stops', '${s.stops.length}'),
       if (road != null && road.lightsPassed > 0) ...[
         ('Traffic lights', '${road.stoppedAtLights} red of ${road.lightsPassed}'),
-        ('Waiting at lights', fmtDuration(road.waitAtLights)),
+        ('Waiting at lights', fmtMinSec(road.waitAtLights)),
+        if (road.cyclesCounted) ('Red phases waited', '${road.redPhases}${road.multiPhaseLights > 0 ? ' (${road.multiPhaseLights} missed a green)' : ''}'),
       ],
       ('Climb', '${s.elevationGainM.round()} m'),
       ('Harsh braking', '${s.harshBrakes}'),
@@ -584,9 +585,18 @@ class _TripDetailPageState extends State<TripDetailPage> {
         road.lightsPassed == 0
             ? 'No traffic lights on this route.'
             : 'You went through ${road.lightsPassed} sets of traffic lights and stopped at ${road.stoppedAtLights}, '
-                'waiting ${fmtDuration(road.waitAtLights)} in total. They are marked on the map: red where you stopped, green where you didn\'t.',
+                'waiting ${fmtMinSec(road.waitAtLights)} in total. They are marked on the map: red where you stopped, green where you didn\'t, '
+                'with a number where you sat through more than one red.',
         style: t.bodySmall,
       ),
+      if (road.cyclesCounted && road.stoppedAtLights > 0) ...[
+        const SizedBox(height: 4),
+        Text(
+          'Longest waits: ${([...road.lights.where((l) => l.stopped)]..sort((a, b) => (b.waitS ?? 0).compareTo(a.waitS ?? 0))).take(3).map((l) => '${fmtMinSec(Duration(seconds: l.waitS ?? 0))}${(l.phases ?? 1) > 1 ? ' (${l.phases} reds)' : ''}').join(', ')}. '
+          'Red phases are estimated from the GPS: a stop of 15 s or more after moving up in the queue counts as another red.',
+          style: t.bodySmall,
+        ),
+      ],
       const SizedBox(height: 4),
       Text('From OpenStreetMap. The first and last 300 m aren\'t looked up, so lights right next to the start or end aren\'t counted.', style: t.bodySmall),
     ]);

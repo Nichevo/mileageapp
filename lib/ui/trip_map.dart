@@ -12,7 +12,7 @@ class TripMap extends StatelessWidget {
   final List<LatLng> stops;
   /// Traffic lights passed: green where the car went straight through,
   /// red where it stopped.
-  final List<({LatLng at, bool stopped})> lights;
+  final List<({LatLng at, bool stopped, int phases})> lights;
   final bool follow; // live view: centre on the latest point
   /// Speed at each route point (km/h). When given, the line is coloured by
   /// speed and a legend is shown.
@@ -71,7 +71,7 @@ class TripMap extends StatelessWidget {
         ),
         MarkerLayer(markers: [
           Marker(point: route.first, width: 18, height: 18, child: _dot(Colors.green.shade700)),
-          for (final l in lights) Marker(point: l.at, width: 14, height: 14, child: _light(l.stopped)),
+          for (final l in lights) Marker(point: l.at, width: l.phases >= 2 ? 20 : 14, height: l.phases >= 2 ? 20 : 14, child: _light(l.stopped, l.phases)),
           for (final s in stops) Marker(point: s, width: 24, height: 24, child: _stopPin(cs)),
           Marker(point: route.last, width: 18, height: 18, child: _dot(follow ? cs.primary : Colors.red.shade700)),
         ]),
@@ -100,12 +100,16 @@ class TripMap extends StatelessWidget {
         decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
       );
 
-  Widget _light(bool stopped) => Container(
+  /// Green: straight through. Red: stopped; the number is red phases
+  /// waited when more than one.
+  Widget _light(bool stopped, int phases) => Container(
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: stopped ? Colors.red.shade600 : Colors.green.shade600,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.black87, width: 2),
         ),
+        child: phases >= 2 ? Text('$phases', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold, height: 1)) : null,
       );
 
   Widget _stopPin(ColorScheme cs) => Container(
