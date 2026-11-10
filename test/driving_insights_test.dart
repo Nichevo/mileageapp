@@ -78,6 +78,18 @@ void main() {
       expect(l.waitS, greaterThan(70));
     });
 
+    test('two long reds in the queue are light waits, not parking', () {
+      final trip = sim([('go', 480), ('stop', 150), ('creep', 80), ('stop', 140), ('go', 600)]);
+      final l = lightWaits(trip, light).single;
+      expect(l.phases, 2);
+      final stats = computeTripStats(trip);
+      expect(stats.stops.length, 2);
+      expect(stats.stops.every((x) => waitingAtLight(x.lat, x.lon, x.duration, [l])), isTrue);
+      // A long stop well away from any light is still a stop.
+      final far = computeTripStats(sim([('go', 100), ('stop', 200), ('go', 1100)])).stops.single;
+      expect(waitingAtLight(far.lat, far.lon, far.duration, [l]), isFalse);
+    });
+
     test('phases survive the JSON round trip; old entries have none', () {
       final r = RoadStats(roadKm: const {RoadClass.local: 1.2}, lights: [LightPass(1, 2, true, waitS: 50, phases: 2), LightPass(3, 4, false, waitS: 0, phases: 0)], waitAtLights: const Duration(seconds: 50));
       final back = RoadStats.fromJson(jsonDecode(jsonEncode(r.toJson())) as Map<String, Object?>);

@@ -11,6 +11,10 @@ class Settings {
   final SharedPreferences _p;
   Settings._(this._p);
 
+  /// Version of the light-phase counting that every trip has been recounted with.
+  int get lightCountVersion => _p.getInt('lightCountVersion') ?? 1;
+  Future<void> setLightCountVersion(int v) => _p.setInt('lightCountVersion', v);
+
   static Future<Settings> load() async => Settings._(await SharedPreferences.getInstance());
 
   String? get activeVehicleId => _p.getString('activeVehicleId');

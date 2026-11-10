@@ -198,7 +198,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                           speedsKmh: pointSpeedsKmh([
                             for (final p in _accurate) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM),
                           ]),
-                          stops: [for (final s in _stops) if (s.lat != null) LatLng(s.lat!, s.lon!)],
+                          stops: [for (final s in _stops) if (s.lat != null && !_atLight(s, road)) LatLng(s.lat!, s.lon!)],
                           lights: [for (final l in road?.lights ?? const <LightPass>[]) (at: LatLng(l.lat, l.lon), stopped: l.stopped, phases: l.phases ?? (l.stopped ? 1 : 0))],
                         ),
                       ),
@@ -493,8 +493,14 @@ class _TripDetailPageState extends State<TripDetailPage> {
     return 480;
   }
 
+  /// A longer stop that was really a wait in the queue at a red light.
+  static bool _atLight(TripStop s, RoadStats? road) =>
+      road != null && s.lat != null && s.departAt != null && waitingAtLight(s.lat!, s.lon!, s.departAt!.difference(s.arriveAt), road.lights);
+
   List<Widget> _statsSection(BuildContext context, TripStats s, RoadStats? road, TripBattery? battery) {
     final t = Theme.of(context).textTheme;
+    final lights = road?.lights ?? const <LightPass>[];
+    final queued = s.stops.where((x) => waitingAtLight(x.lat, x.lon, x.duration, lights)).length;
     final litres = _fuel == null ? null : s.distanceKm * _fuel!.per100 / 100;
     final tiles = <(String, String)>[
       ('Distance', '${fmtKm1(s.distanceKm)} km'),
@@ -505,7 +511,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
       ('Moving average', fmtKmh(s.movingAvgKmh)),
       ('Top speed', fmtKmh(s.maxKmh)),
       ('Short stops', '${s.shortStops}'),
-      ('Longer stops', '${s.stops.length}'),
+      ('Longer stops', '${s.stops.length - queued}'),
       if (road != null && road.lightsPassed > 0) ...[
         ('Traffic lights', '${road.stoppedAtLights} red of ${road.lightsPassed}'),
         ('Waiting at lights', fmtMinSec(road.waitAtLights)),
@@ -546,7 +552,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
       const SizedBox(height: 6),
       Text('Split by speed: urban under 60 km/h, open road 60–90, motorway 90 and over.', style: t.bodySmall),
       const SizedBox(height: 4),
-      Text('Short stops are 5 seconds to 2 minutes stationary, mostly traffic lights and give-ways. Longer stops are marked on the map.', style: t.bodySmall),
+      Text(
+          'Short stops are 5 seconds to 2 minutes stationary, mostly traffic lights and give-ways. Longer stops are marked on the map. '
+          '${queued == 0 ? '' : 'Long waits in the queue at a red light (up to 5 minutes) count as waiting at lights, not stops${queued == 1 ? '' : ' ($queued here)'}.'}',
+          style: t.bodySmall),
       if (_fuel != null) ...[
         const SizedBox(height: 4),
         Text('Fuel estimate uses your recent ${_fuel!.per100.toStringAsFixed(1)} L/100 km and last price ${fmtPrice(_fuel!.price)}.', style: t.bodySmall),

@@ -165,6 +165,9 @@ const double signalClusterM = 45; // signal nodes this close are one intersectio
 const double lightOnRouteM = 25; // route passes this close to a signal node
 const double lightStopM = 50; // a stop this close to an intersection waited at it
 const Duration lightStopMax = Duration(minutes: 5);
+/// A queue stop counts for a light passed up to this long after it ended
+/// (room for two or three long reds in a row).
+const Duration lightLeadMax = Duration(minutes: 8);
 const double lightQueueM = 150; // a queue for a light can reach back this far
 const double lightPassM = 40; // the route came this close to the light
 const Duration redPhaseMin = Duration(seconds: 15); // a stop this long is a red
@@ -387,6 +390,12 @@ Map<RoadClass, double> roadShares(Map<RoadClass, double> km) {
 /// after moving up at least [queueMoveM] is another red: the queue moved on
 /// a green but you didn't get through. The signal itself isn't known, so it
 /// is an estimate.
+/// A longer stop in the queue before a light you were caught at (up to
+/// [lightQueueM] back, no longer than [lightStopMax]) was waiting for the
+/// lights, not parking.
+bool waitingAtLight(double lat, double lon, Duration d, List<LightPass> lights) =>
+    d <= lightStopMax && lights.any((l) => l.stopped && metresBetween((lat: lat, lon: lon), (lat: l.lat, lon: l.lon)) <= lightQueueM);
+
 List<LightPass> lightWaits(List<GpsSample> raw, List<LL> lights) {
   final pts = _clean(raw);
   if (lights.isEmpty) return const [];
@@ -427,7 +436,7 @@ List<LightPass> lightWaits(List<GpsSample> raw, List<LL> lights) {
       if (d > lightQueueM) continue;
       // Stopped before reaching it, and got there soon after moving off.
       final lead = at.difference(span.depart);
-      if (span.arrive.isAfter(at.add(const Duration(seconds: 5))) || lead > const Duration(minutes: 3)) continue;
+      if (span.arrive.isAfter(at.add(const Duration(seconds: 5))) || lead > lightLeadMax) continue;
       // The next light ahead wins; distance breaks ties.
       final key = lead.inSeconds.toDouble() + d / 1000;
       if (key < bestKey) {

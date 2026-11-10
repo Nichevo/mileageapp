@@ -10,7 +10,11 @@ Future<void> lookUpRecentTrips(Repository repo, Settings settings) async {
   final vid = settings.activeVehicleId;
   if (vid == null) return;
   try {
-    await RoadLookup.countLightCycles(repo); // older trips, once each, offline
+    // Older trips, once each, offline. A newer way of counting recounts all.
+    const version = 2;
+    final all = settings.lightCountVersion < version;
+    await RoadLookup.countLightCycles(repo, force: all);
+    if (all) await settings.setLightCountVersion(version);
   } catch (_) {}
   if (settings.roadLookup) await RoadLookup.analyseRecent(repo, vid);
   if (settings.weatherLookup) await WeatherLookup.analyseRecent(repo, vid);
