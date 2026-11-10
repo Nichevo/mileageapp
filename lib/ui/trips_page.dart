@@ -39,7 +39,23 @@ class _TripsPageState extends State<TripsPage> {
   TripSize _size = TripSize.any;
   final _selected = <String>{};
   String? _placeId; // filter: trips starting or ending here
-  bool _allVehicles = false;
+  /// Every vehicle's trips (chosen from the vehicle chip).
+  bool get _allVehicles => _viewAll?.value ?? false;
+  ValueNotifier<bool>? _viewAll;
+  void _onViewAll() => setState(() {
+        _selected.clear();
+        _endsKey = '';
+      });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final n = AppScope.of(context).settings.viewAll;
+    if (!identical(n, _viewAll)) {
+      _viewAll?.removeListener(_onViewAll);
+      _viewAll = n..addListener(_onViewAll);
+    }
+  }
 
   /// Start and end of every recorded trip, for place names.
   Map<String, ({({double lat, double lon}) from, ({double lat, double lon}) to})> _allEnds = const {};
@@ -58,6 +74,7 @@ class _TripsPageState extends State<TripsPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _viewAll?.removeListener(_onViewAll);
     super.dispose();
   }
 
@@ -121,7 +138,7 @@ class _TripsPageState extends State<TripsPage> {
       appBar: AppBar(
         title: const Text('Trips'),
         actions: [
-          const VehicleChip(),
+          const VehicleChip(allowAll: true),
           IconButton(
             tooltip: 'Routes you drive often',
             icon: const Icon(Icons.route_outlined),
@@ -166,7 +183,6 @@ class _TripsPageState extends State<TripsPage> {
       stream: scope.repo.watchVehicles(),
       builder: (context, vsnap) {
         final vehicles = {for (final v in vsnap.data ?? const <Vehicle>[]) v.id: v};
-        if (vehicles.length < 2) _allVehicles = false;
         return StreamBuilder<List<Trip>>(
           // Keyed so switching between one and all vehicles starts a new stream.
           key: ValueKey(_allVehicles),
@@ -225,7 +241,7 @@ class _TripsPageState extends State<TripsPage> {
                     ),
                   ),
                 const SizedBox(height: 8),
-                if (trips.isNotEmpty || _allVehicles || vehicles.length > 1) _filterBar(context, places, vehicles.length > 1),
+                if (trips.isNotEmpty) _filterBar(context, places),
                 if (trips.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(24),
@@ -331,7 +347,7 @@ class _TripsPageState extends State<TripsPage> {
     );
   }
 
-  Widget _filterBar(BuildContext context, List<Place> places, bool manyVehicles) {
+  Widget _filterBar(BuildContext context, List<Place> places) {
     Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, {bool highlight = false}) => PopupMenuButton<T>(
       initialValue: value,
       onSelected: (v) => setState(() => set(v)),
@@ -346,11 +362,6 @@ class _TripsPageState extends State<TripsPage> {
       spacing: 8,
       runSpacing: 4,
       children: [
-        if (manyVehicles)
-          menu<bool>(Icons.directions_car_outlined, _allVehicles, const [false, true], (a) => a ? 'All vehicles' : 'This vehicle', (v) {
-            _allVehicles = v;
-            _selected.clear();
-          }, highlight: _allVehicles),
         menu(Icons.sort, _sort, TripSort.values, tripSortLabel, (v) => _sort = v),
         menu(Icons.date_range, _period, TripPeriod.values, tripPeriodLabel, (v) => _period = v, highlight: _period != TripPeriod.all),
         menu(Icons.straighten, _size, TripSize.values, tripSizeLabel, (v) => _size = v, highlight: _size != TripSize.any),

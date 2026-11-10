@@ -38,28 +38,45 @@ class _InsightsPageState extends State<InsightsPage> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final vid = scope.settings.activeVehicleId!;
+    return ValueListenableBuilder<bool>(
+      valueListenable: scope.settings.viewAll,
+      builder: (context, viewAll, _) => ValueListenableBuilder<String?>(
+        valueListenable: scope.settings.activeVehicle,
+        builder: (context, active, _) => _page(scope, active!, viewAll),
+      ),
+    );
+  }
+
+  Widget _page(AppScope scope, String vid, bool viewAll) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Insights'), actions: const [VehicleChip()]),
+      appBar: AppBar(title: const Text('Insights'), actions: const [VehicleChip(allowAll: true)]),
       body: StreamBuilder<List<Vehicle>>(
         stream: scope.repo.watchVehicles(),
         builder: (context, vs) {
           final kind = vs.data?.where((v) => v.id == vid).firstOrNull?.kind ?? 'petrol';
+          final kinds = viewAll ? {for (final v in vs.data ?? const <Vehicle>[]) v.kind} : {kind};
           final energy = _energyKind == 'charge'
               ? Energy.charge
               : _energyKind == 'fuel'
               ? Energy.fuel
               : Energy.primaryFor(kind);
-          final both = usesFuel(kind) && usesCharging(kind);
+          final both = kinds.any(usesFuel) && kinds.any(usesCharging);
           return StreamBuilder<List<EnergyEvent>>(
-            stream: scope.repo.watchEvents(vid, kind: null),
+            key: ValueKey(viewAll ? null : vid),
+            stream: scope.repo.watchEvents(viewAll ? null : vid, kind: null),
             builder: (context, snap) {
               final all = (snap.data ?? const <EnergyEvent>[]).where((e) => e.kind == energy.eventKind).toList();
               final now = DateTime.now();
               final cutoff = _rangeMonths == 0 ? null : DateTime(now.year, now.month - _rangeMonths + 1, 1);
-              final allRows = Repository.toFuelRows(all, kind: energy.eventKind);
-              final rows = cutoff == null ? allRows : allRows.where((r) => !r.at.isBefore(cutoff)).toList();
-              final stats = tankStats(rows);
+              // Each vehicle's fills are worked out on their own, then added up.
+              final byVehicle = <String, List<FuelRow>>{
+                for (final v in all.map((e) => e.vehicleId).toSet())
+                  v: Repository.toFuelRows([for (final e in all) if (e.vehicleId == v) e], kind: energy.eventKind),
+              };
+              List<FuelRow> inRange(List<FuelRow> r) => cutoff == null ? r : r.where((x) => !x.at.isBefore(cutoff)).toList();
+              final allRows = [for (final r in byVehicle.values) ...r];
+              final rows = inRange(allRows);
+              final stats = [for (final r in byVehicle.values) ...tankStats(inRange(r))]..sort((a, b) => a.fill.at.compareTo(b.fill.at));
               final cs = Theme.of(context).colorScheme;
               if (all.length < 2) {
                 return Column(
@@ -70,10 +87,13 @@ class _InsightsPageState extends State<InsightsPage> {
                 );
               }
               // Spreading uses every fill, so the first period in range is complete.
-              final periods = periodTotals(allRows, _period, from: cutoff);
+              final periods = mergePeriodTotals([for (final r in byVehicle.values) periodTotals(r, _period, from: cutoff)], _period);
               final totalKm = periods.fold<double>(0, (a, t) => a + t.km);
               final totalCost = periods.fold<double>(0, (a, t) => a + t.cost);
-              final byMonth = _kmPerDayByMonth(rows);
+              final byMonth = <int, double>{};
+              for (final r in byVehicle.values) {
+                _kmPerDayByMonth(inRange(r)).forEach((m, v) => byMonth[m] = (byMonth[m] ?? 0) + v);
+              }
               final byDow = _fillsByWeekday(rows);
               final unit = switch (_period) {
                 Period.week => 'week',
@@ -83,7 +103,10 @@ class _InsightsPageState extends State<InsightsPage> {
               List<_Bar> series(double? Function(PeriodTotals) f) => [
                 for (var i = 0; i < periods.length; i++) _Bar(_axisLabel(periods, i), _fullLabel(periods[i].start), f(periods[i]) ?? 0),
               ];
-              final gaps = [for (final g in fillGaps(allRows)) if (cutoff == null || !g.at.isBefore(cutoff)) g];
+              final gaps = [
+                for (final r in byVehicle.values)
+                  for (final g in fillGaps(r)) if (cutoff == null || !g.at.isBefore(cutoff)) g,
+              ];
               final gapsBy = fillGapsByPeriod(gaps, _period);
               final busiest = periods.isEmpty ? null : periods.reduce((a, b) => a.km >= b.km ? a : b);
               return ListView(
@@ -187,7 +210,7 @@ class _InsightsPageState extends State<InsightsPage> {
                       decimals: 0,
                     ),
                   ),
-                  _drivingSection(vid, cutoff, unit),
+                  _drivingSection(viewAll ? null : vid, cutoff, unit),
                 ],
               );
             },

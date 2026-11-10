@@ -21,10 +21,16 @@ class Settings {
   Future<void> setActiveVehicleId(String id) async {
     await _p.setString('activeVehicleId', id);
     activeVehicle.value = id;
+    viewAll.value = false;
   }
 
   /// Changes when you switch vehicles, so the app can rebuild for it.
   late final ValueNotifier<String?> activeVehicle = ValueNotifier(activeVehicleId);
+
+  /// Trips, History and Insights showing every vehicle at once. New
+  /// fill-ups and trips still go to the active vehicle. Not saved: the app
+  /// opens on one vehicle.
+  final ValueNotifier<bool> viewAll = ValueNotifier(false);
 
   String? get spreadsheetId => _p.getString('spreadsheetId');
   Future<void> setSpreadsheetId(String? id) async =>

@@ -385,7 +385,7 @@ Future<void> applyExpiryDates(Repository repo, String vehicleId, {DateTime? wofE
 }
 
 /// Bottom sheet listing your vehicles: tap one to switch, or add another.
-Future<void> showVehicleSwitcher(BuildContext context) async {
+Future<void> showVehicleSwitcher(BuildContext context, {bool allowAll = false}) async {
   final scope = AppScope.of(context);
   final vehicles = await scope.repo.liveVehicles();
   final past = (await scope.repo.vehicles()).length - vehicles.length;
@@ -395,6 +395,14 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
     showDragHandle: true,
     builder: (c) => SafeArea(
       child: ListView(shrinkWrap: true, children: [
+        if (allowAll && vehicles.length + past > 1)
+          ListTile(
+            leading: const Icon(Icons.garage_outlined),
+            title: const Text('All vehicles'),
+            subtitle: const Text('Show every vehicle together on this page'),
+            trailing: scope.settings.viewAll.value ? const Icon(Icons.check) : null,
+            onTap: () => Navigator.pop(c, 'all'),
+          ),
         for (final v in vehicles)
           ListTile(
             leading: Icon(v.ownership == 'own' ? vehicleIcon(v.kind) : Icons.car_rental),
@@ -405,7 +413,7 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
               ?v.make,
               ?v.model,
             ].join(' · ')),
-            trailing: v.id == scope.settings.activeVehicleId ? const Icon(Icons.check) : null,
+            trailing: v.id == scope.settings.activeVehicleId && !scope.settings.viewAll.value ? const Icon(Icons.check) : null,
             onTap: () => Navigator.pop(c, v.id),
           ),
         ListTile(
@@ -436,7 +444,9 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
     ),
   );
   if (picked == null || !context.mounted) return;
-  if (picked == '+') {
+  if (picked == 'all') {
+    scope.settings.viewAll.value = true;
+  } else if (picked == '+') {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage(isNew: true)));
   } else if (picked == 'loan') {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoanCarPage()));
@@ -450,38 +460,48 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
     ));
   } else if (picked != scope.settings.activeVehicleId) {
     await scope.settings.setActiveVehicleId(picked);
+  } else {
+    scope.settings.viewAll.value = false;
   }
 }
 
 IconData vehicleIcon(String kind) => kind == 'ev' ? Icons.electric_car : Icons.directions_car;
 
 /// The current vehicle's name as a button that switches vehicle, for app bars.
+/// With [allowAll], the switcher also offers "All vehicles" (Trips, History
+/// and Insights).
 class VehicleChip extends StatelessWidget {
-  const VehicleChip({super.key});
+  final bool allowAll;
+  const VehicleChip({super.key, this.allowAll = false});
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    return ValueListenableBuilder<String?>(
-      valueListenable: scope.settings.activeVehicle,
-      builder: (context, vid, _) => StreamBuilder<List<Vehicle>>(
-        stream: scope.repo.watchVehicles(),
-        builder: (context, snap) {
-          final v = snap.data?.where((x) => x.id == vid).firstOrNull;
-          if (v == null) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: ActionChip(
-              avatar: Icon(vehicleIcon(v.kind), size: 18),
-              label: Row(mainAxisSize: MainAxisSize.min, children: [
-                ConstrainedBox(constraints: const BoxConstraints(maxWidth: 140), child: Text(v.name, overflow: TextOverflow.ellipsis)),
-                const Icon(Icons.arrow_drop_down, size: 18),
-              ]),
-              tooltip: 'Switch vehicle',
-              onPressed: () => showVehicleSwitcher(context),
-            ),
-          );
-        },
+    return ValueListenableBuilder<bool>(
+      valueListenable: scope.settings.viewAll,
+      builder: (context, all, _) => ValueListenableBuilder<String?>(
+        valueListenable: scope.settings.activeVehicle,
+        builder: (context, vid, _) => StreamBuilder<List<Vehicle>>(
+          stream: scope.repo.watchVehicles(),
+          builder: (context, snap) {
+            final v = snap.data?.where((x) => x.id == vid).firstOrNull;
+            if (v == null) return const SizedBox.shrink();
+            final showAll = all && allowAll;
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ActionChip(
+                avatar: Icon(showAll ? Icons.garage_outlined : vehicleIcon(v.kind), size: 18),
+                label: Row(mainAxisSize: MainAxisSize.min, children: [
+                  ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 140), child: Text(showAll ? 'All vehicles' : v.name, overflow: TextOverflow.ellipsis)),
+                  const Icon(Icons.arrow_drop_down, size: 18),
+                ]),
+                tooltip: 'Switch vehicle',
+                onPressed: () => showVehicleSwitcher(context, allowAll: allowAll),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

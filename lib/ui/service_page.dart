@@ -7,6 +7,7 @@ import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/care.dart';
 import 'attachments.dart';
+import 'expense_page.dart' show ExpenseDetailPage;
 import 'format.dart';
 
 /// Kind of record, as stored on expenses and service items.
@@ -221,7 +222,7 @@ class _History extends StatelessWidget {
                         Text(fmtMoney(e.cost)),
                       ],
                     ),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceRecordPage(expense: e))),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ExpenseDetailPage(expenseId: e.id))),
                     onLongPress: () async {
                       final ok = await showDialog<bool>(
                         context: context,
@@ -249,72 +250,6 @@ class _History extends StatelessWidget {
 Future<void> deleteServiceRecord(AppScope scope, String id) async {
   await (await AttachmentStore.get()).removeOwner(scope.repo, 'expense', id);
   await scope.repo.deleteExpense(id);
-}
-
-/// One service, WOF or other record, with its photos and documents.
-class ServiceRecordPage extends StatelessWidget {
-  final Expense expense;
-  const ServiceRecordPage({super.key, required this.expense});
-
-  @override
-  Widget build(BuildContext context) {
-    final e = expense;
-    final scope = AppScope.of(context);
-    final t = Theme.of(context).textTheme;
-    Widget row(String label, String value) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(label, style: t.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ),
-          Expanded(child: Text(value, style: t.bodyMedium)),
-        ],
-      ),
-    );
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(e.description),
-        actions: [
-          IconButton(
-            tooltip: 'Delete',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (c) => AlertDialog(
-                  title: const Text('Delete this record?'),
-                  content: const Text('Its photos and documents are deleted too.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
-                  ],
-                ),
-              );
-              if (ok != true) return;
-              await deleteServiceRecord(scope, e.id);
-              if (context.mounted) Navigator.of(context).pop();
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          row('Type', expenseKinds[e.kind] ?? e.kind),
-          row('Date', fmtDate(e.at)),
-          if (e.odometerKm != null) row('Odometer', '${fmtKm(e.odometerKm!)} km'),
-          row('Cost', fmtMoney(e.cost)),
-          if (e.location != null) row('Where', e.location!),
-          if (e.notes != null) row('Notes', e.notes!),
-          const SizedBox(height: 20),
-          AttachmentStrip(vehicleId: e.vehicleId, ownerKind: 'expense', ownerId: e.id, docType: docTypeForExpense(e.kind)),
-        ],
-      ),
-    );
-  }
 }
 
 /// Pick from the typical NZ schedule. "Last done" is filled in from history
@@ -537,7 +472,8 @@ class _ServiceItemFormState extends State<ServiceItemForm> {
 /// Record a service (or WOF, rego, tyres…) and tick off what was done.
 class LogServiceForm extends StatefulWidget {
   final double? currentKm;
-  const LogServiceForm({super.key, this.currentKm});
+  final String kind;
+  const LogServiceForm({super.key, this.currentKm, this.kind = 'service'});
   @override
   State<LogServiceForm> createState() => _LogServiceFormState();
 }
@@ -549,7 +485,7 @@ class _LogServiceFormState extends State<LogServiceForm> {
   final _desc = TextEditingController();
   final _where = TextEditingController();
   final _notes = TextEditingController();
-  String _kind = 'service';
+  late String _kind = widget.kind;
   final _done = <String>{};
   final _id = newId();
   var _saved = false;
@@ -598,7 +534,7 @@ class _LogServiceFormState extends State<LogServiceForm> {
       builder: (context, snap) {
         final items = snap.data ?? const <ServiceItem>[];
         return Scaffold(
-          appBar: AppBar(title: const Text('Log a service')),
+          appBar: AppBar(title: Text(widget.kind == 'wof' ? 'Log a WOF' : 'Log a service')),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [

@@ -237,3 +237,26 @@ List<PeriodTotals> periodTotals(List<FuelRow> rows, Period p, {DateTime? from}) 
   final cut = periodStart(from, p);
   return out.where((t) => !t.start.isBefore(cut)).toList();
 }
+
+/// Several vehicles' period totals added together, every period from the
+/// earliest to the latest present (empty ones included).
+List<PeriodTotals> mergePeriodTotals(List<List<PeriodTotals>> lists, Period p) {
+  final all = [for (final l in lists) ...l];
+  if (all.isEmpty) return const [];
+  final byStart = <DateTime, PeriodTotals>{};
+  for (final t in all) {
+    final m = byStart.putIfAbsent(t.start, () => PeriodTotals(t.start));
+    m
+      ..km += t.km
+      ..quantity += t.quantity
+      ..cost += t.cost
+      ..filledQuantity += t.filledQuantity
+      ..filledCost += t.filledCost;
+  }
+  final starts = byStart.keys.toList()..sort();
+  final out = <PeriodTotals>[];
+  for (var cur = starts.first; !cur.isAfter(starts.last); cur = nextPeriod(cur, p)) {
+    out.add(byStart[cur] ?? PeriodTotals(cur));
+  }
+  return out;
+}

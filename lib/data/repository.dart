@@ -125,9 +125,13 @@ class Repository {
 
   // ---- fuel / charge events ---------------------------------------------
 
-  Stream<List<EnergyEvent>> watchEvents(String vehicleId, {String? kind = 'fuel'}) =>
+  /// A vehicle's fills (every vehicle's when [vehicleId] is null).
+  Stream<List<EnergyEvent>> watchEvents(String? vehicleId, {String? kind = 'fuel'}) =>
       (db.select(db.energyEvents)
-            ..where((e) => (kind == null ? e.vehicleId.equals(vehicleId) : e.vehicleId.equals(vehicleId) & e.kind.equals(kind)))
+            ..where((e) {
+              final Expression<bool> v = vehicleId == null ? const Constant(true) : e.vehicleId.equals(vehicleId);
+              return kind == null ? v : v & e.kind.equals(kind);
+            })
             ..orderBy([(e) => OrderingTerm.desc(e.odometerKm)]))
           .watch();
 
@@ -237,9 +241,10 @@ class Repository {
   Stream<List<Expense>> watchTripExpenses(String tripId) =>
       (db.select(db.expenses)..where((e) => e.tripId.equals(tripId))).watch();
 
-  Stream<List<Expense>> watchExpenses(String vehicleId) =>
+  /// A vehicle's expenses, newest first; every vehicle's when null.
+  Stream<List<Expense>> watchExpenses(String? vehicleId) =>
       (db.select(db.expenses)
-            ..where((e) => e.vehicleId.equals(vehicleId))
+            ..where((e) => vehicleId == null ? const Constant(true) : e.vehicleId.equals(vehicleId))
             ..orderBy([(e) => OrderingTerm.desc(e.at)]))
           .watch();
 
@@ -249,6 +254,10 @@ class Repository {
       .get();
 
   Future<void> upsertExpense(ExpensesCompanion e) => db.into(db.expenses).insertOnConflictUpdate(e);
+
+  Stream<Expense?> watchExpense(String id) => (db.select(db.expenses)..where((e) => e.id.equals(id))).watchSingleOrNull();
+
+  Future<Expense?> expense(String id) => (db.select(db.expenses)..where((e) => e.id.equals(id))).getSingleOrNull();
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
 
@@ -266,6 +275,13 @@ class Repository {
         ..where((a) => a.vehicleId.equals(vehicleId))
         ..orderBy([(a) => OrderingTerm.desc(a.addedAt)]))
       .watch();
+
+  /// Moves a document onto another record (e.g. a loose one onto an expense).
+  Future<void> relinkAttachment(String id, String ownerKind, String ownerId) =>
+      (db.update(db.attachments)..where((a) => a.id.equals(id))).write(AttachmentsCompanion(ownerKind: Value(ownerKind), ownerId: Value(ownerId)));
+
+  /// Every vehicle's attachments when [vehicleId] is null.
+  Stream<List<Attachment>> watchAllAttachments() => db.select(db.attachments).watch();
 
   Future<void> updateAttachment(String id, {required String docType, String? title, DateTime? docDate}) =>
       (db.update(db.attachments)..where((a) => a.id.equals(id)))

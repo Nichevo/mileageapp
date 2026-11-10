@@ -256,10 +256,19 @@ void main() {
     await settle(tester);
     expect(find.text('In my car'), findsOneWidget);
     expect(find.text('In the ute'), findsNothing);
-    await tester.tap(find.text('This vehicle'));
-    await settle(tester);
+    Future<void> io() async {
+      for (var i = 0; i < 8; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await tester.tap(find.text('My car'));
+    await io();
     await tester.tap(find.text('All vehicles').last);
+    await io();
     await settle(tester);
+    expect(settings.viewAll.value, isTrue);
     expect(find.text('In my car'), findsOneWidget);
     expect(find.text('In the ute'), findsOneWidget);
     expect(find.textContaining('Work ute · '), findsOneWidget);

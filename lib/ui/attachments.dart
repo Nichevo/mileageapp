@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app.dart';
 import '../data/attachment_store.dart';
 import '../data/database.dart';
+import 'expense_page.dart' show ExpenseDetailPage;
 import 'format.dart';
 
 /// Where a picked file came from; tests replace this.
@@ -266,7 +267,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     await _store!.add(scope.repo, sourcePath: path, vehicleId: vid, ownerKind: 'vehicle', ownerId: vid, docType: d.docType, title: d.title, docDate: d.date);
   }
 
-  static const _from = {'expense': 'From a service record', 'policy': 'From an insurance policy'};
+  static const _from = {'expense': 'On an expense', 'policy': 'From an insurance policy'};
 
   @override
   Widget build(BuildContext context) {
@@ -299,6 +300,13 @@ class _DocumentsPageState extends State<DocumentsPage> {
                           title: Text(a.title ?? docTypes[a.docType]!),
                           subtitle: Text([fmtDate(a.docDate ?? a.addedAt), if (_from[a.ownerKind] != null) _from[a.ownerKind]!].join(' · ')),
                           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AttachmentViewer(attachment: a, store: store))),
+                          trailing: a.ownerKind == 'expense'
+                              ? IconButton(
+                                  tooltip: 'Open the expense',
+                                  icon: const Icon(Icons.receipt_long_outlined),
+                                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ExpenseDetailPage(expenseId: a.ownerId))),
+                                )
+                              : null,
                         ),
                     ],
                 ]);

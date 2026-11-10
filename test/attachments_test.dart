@@ -119,7 +119,7 @@ void main() {
     await tester.pumpAndSettle();
     await io();
     expect(find.text('Service invoice'), findsWidgets);
-    expect(find.textContaining('From a service record'), findsOneWidget);
+    expect(find.textContaining('On an expense'), findsOneWidget);
 
     // And a stand-alone document can be added there.
     await tester.tap(find.text('Add document'));

@@ -9,6 +9,9 @@ import '../domain/energy.dart';
 import 'charge_form.dart';
 import 'format.dart';
 import 'toll_form.dart';
+import 'expense_page.dart';
+import 'service_page.dart' show expenseKinds;
+import 'vehicle_page.dart' show VehicleChip;
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -19,45 +22,75 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   int? _year;
   int _tab = 0; // 0 fills, 1 expenses
+  // Expense filters.
+  String? _kind;
+  int? _expYear;
+  bool _withDocs = false;
+  bool _searching = false;
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final vid = scope.settings.activeVehicleId!;
-    return Scaffold(
-      appBar: AppBar(title: const Text('History')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Fuel & charging')),
-                ButtonSegment(value: 1, label: Text('Expenses')),
-              ],
-              selected: {_tab},
-              onSelectionChanged: (s) => setState(() => _tab = s.first),
-            ),
-          ),
-          Expanded(child: _tab == 0 ? _fills(scope, vid) : _expenses(scope, vid)),
-        ],
+    return ValueListenableBuilder<bool>(
+      valueListenable: scope.settings.viewAll,
+      builder: (context, all, _) => ValueListenableBuilder<String?>(
+        valueListenable: scope.settings.activeVehicle,
+        builder: (context, vid, _) => StreamBuilder<List<Vehicle>>(
+          stream: scope.repo.watchVehicles(),
+          builder: (context, vs) {
+            final names = {for (final v in vs.data ?? const <Vehicle>[]) v.id: v.name};
+            final showVid = all ? null : vid!;
+            return Scaffold(
+              appBar: AppBar(title: const Text('History'), actions: const [VehicleChip(allowAll: true)]),
+              floatingActionButton: _tab == 1
+                  ? FloatingActionButton.extended(onPressed: () => addExpense(context), icon: const Icon(Icons.add), label: const Text('Add expense'))
+                  : null,
+              body: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                    child: SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 0, label: Text('Fuel & charging')),
+                        ButtonSegment(value: 1, label: Text('Expenses')),
+                      ],
+                      selected: {_tab},
+                      onSelectionChanged: (s) => setState(() => _tab = s.first),
+                    ),
+                  ),
+                  Expanded(child: _tab == 0 ? _fills(scope, showVid, all ? names : null) : _expenses(scope, showVid, all ? names : null)),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _fills(AppScope scope, String vid) {
+  /// [names] is set when every vehicle is shown, to label each row.
+  Widget _fills(AppScope scope, String? vid, Map<String, String>? names) {
     return StreamBuilder<List<EnergyEvent>>(
       stream: scope.repo.watchEvents(vid, kind: null),
       builder: (context, snap) {
         final events = snap.data ?? const <EnergyEvent>[];
         if (events.isEmpty) return const Center(child: Text('Nothing logged yet'));
-        // Economy is worked out separately for fill-ups and charges.
-        final byId = {
-          for (final kind in ['fuel', 'charge'])
-            for (final s in tankStats(Repository.toFuelRows(events, kind: kind))) (kind, s.fill.odometerKm): s,
+        // Economy is worked out separately for each vehicle, and for fill-ups and charges.
+        final byId = <(String, String, double), TankStat>{
+          for (final v in events.map((e) => e.vehicleId).toSet())
+            for (final kind in ['fuel', 'charge'])
+              for (final s in tankStats(Repository.toFuelRows([for (final e in events) if (e.vehicleId == v) e], kind: kind))) (v, kind, s.fill.odometerKm): s,
         };
+        final sorted = names == null ? events : ([...events]..sort((a, b) => b.at.compareTo(a.at)));
         final years = events.map((e) => e.at.year).toSet().toList()..sort((a, b) => b.compareTo(a));
-        final shown = _year == null ? events : events.where((e) => e.at.year == _year).toList();
+        final shown = _year == null ? sorted : sorted.where((e) => e.at.year == _year).toList();
         return Column(
           children: [
             SizedBox(
@@ -84,9 +117,10 @@ class _HistoryPageState extends State<HistoryPage> {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final e = shown[i];
-                  final s = byId[(e.kind, e.odometerKm)];
+                  final s = byId[(e.vehicleId, e.kind, e.odometerKm)];
                   final energy = e.kind == 'charge' ? Energy.charge : Energy.fuel;
                   final tags = [
+                    if (names != null) names[e.vehicleId] ?? '',
                     if (energy.isCharge) chargePlaceLabel(e.chargerType),
                     if (e.stationName != null) e.stationName!,
                     if (e.paymentNote != null) e.paymentNote!,
@@ -117,39 +151,107 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _expenses(AppScope scope, String vid) {
-    return StreamBuilder<List<Expense>>(
-      stream: scope.repo.watchExpenses(vid),
-      builder: (context, snap) {
-        final items = snap.data ?? const <Expense>[];
-        final add = Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => editTollParking(context, kind: 'parking'),
-              icon: const Icon(Icons.local_parking),
-              label: const Text('Add toll or parking'),
-            ),
-          ),
-        );
-        if (items.isEmpty) {
-          return Column(children: [add, const Expanded(child: Center(child: Text('No expenses yet. Imported maintenance records appear here.')))]);
+  Widget _expenses(AppScope scope, String? vid, Map<String, String>? names) {
+    return StreamBuilder<List<Attachment>>(
+      stream: vid == null ? scope.repo.watchAllAttachments() : scope.repo.watchVehicleAttachments(vid),
+      builder: (context, docsSnap) {
+        final docs = <String, int>{};
+        for (final a in docsSnap.data ?? const <Attachment>[]) {
+          if (a.ownerKind == 'expense') docs[a.ownerId] = (docs[a.ownerId] ?? 0) + 1;
         }
-        return Column(children: [add, Expanded(child: ListView.separated(
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, i) {
-            final x = items[i];
-            return ListTile(
-              leading: Icon(_iconFor(x.kind)),
-              onTap: x.kind == 'toll' || x.kind == 'parking' ? () => editTollParking(context, existing: x) : null,
-              title: Text(x.description),
-              subtitle: Text('${fmtDate(x.at)}${x.odometerKm == null ? '' : ' · ${fmtKm(x.odometerKm!)} km'}${x.location == null ? '' : ' · ${x.location}'}'),
-              trailing: Text(fmtMoney(x.cost), style: const TextStyle(fontWeight: FontWeight.w600)),
+        return StreamBuilder<List<Expense>>(
+          stream: scope.repo.watchExpenses(vid),
+          builder: (context, snap) {
+            final items = snap.data ?? const <Expense>[];
+            final t = Theme.of(context).textTheme;
+            if (items.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No expenses yet. Tap Add expense for a service, WOF, rego, tyres, toll, parking or anything else. Imported maintenance records appear here too.',
+                      textAlign: TextAlign.center),
+                ),
+              );
+            }
+            final kinds = [for (final k in expenseKinds.keys) if (items.any((e) => e.kind == k)) k];
+            final years = items.map((e) => e.at.year).toSet().toList()..sort((a, b) => b.compareTo(a));
+            if (_kind != null && !kinds.contains(_kind)) _kind = null;
+            if (_expYear != null && !years.contains(_expYear)) _expYear = null;
+            final shown = filterExpenses(items, kind: _kind, year: _expYear, query: _query.text, withDocs: _withDocs ? docs.keys.toSet() : null);
+            final total = shown.fold(0.0, (a, e) => a + e.cost);
+            Widget menu<T>(IconData icon, T value, List<T> values, String Function(T) label, void Function(T) set, bool on) => PopupMenuButton<T>(
+                  initialValue: value,
+                  onSelected: (v) => setState(() => set(v)),
+                  itemBuilder: (_) => [for (final v in values) PopupMenuItem(value: v, child: Text(label(v)))],
+                  child: Chip(
+                    avatar: Icon(icon, size: 18),
+                    label: Text(label(value)),
+                    backgroundColor: on ? Theme.of(context).colorScheme.secondaryContainer : null,
+                  ),
+                );
+            final filtered = _kind != null || _expYear != null || _withDocs || _query.text.trim().isNotEmpty;
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 88),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    menu<String>(Icons.category_outlined, _kind ?? '', ['', ...kinds], (k) => k.isEmpty ? 'Any type' : expenseKinds[k]!, (v) => _kind = v.isEmpty ? null : v,
+                        _kind != null),
+                    menu<int>(Icons.date_range, _expYear ?? 0, [0, ...years], (y) => y == 0 ? 'Any year' : '$y', (v) => _expYear = v == 0 ? null : v, _expYear != null),
+                    FilterChip(
+                      avatar: const Icon(Icons.attach_file, size: 18),
+                      label: const Text('With documents'),
+                      selected: _withDocs,
+                      onSelected: (v) => setState(() => _withDocs = v),
+                    ),
+                    IconButton(
+                      tooltip: 'Search',
+                      icon: Icon(_searching ? Icons.search_off : Icons.search),
+                      onPressed: () => setState(() {
+                        _searching = !_searching;
+                        if (!_searching) _query.clear();
+                      }),
+                    ),
+                  ]),
+                ),
+                if (_searching)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                    child: TextField(
+                      controller: _query,
+                      autofocus: true,
+                      decoration: const InputDecoration(hintText: 'Search description, place or notes', prefixIcon: Icon(Icons.search), isDense: true, border: OutlineInputBorder()),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                  child: Text('${shown.length} expense${shown.length == 1 ? '' : 's'} · ${fmtMoney(total)}${filtered ? ' (filtered)' : ''}', style: t.bodySmall),
+                ),
+                if (shown.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('No expenses match these filters.', textAlign: TextAlign.center)),
+                for (final x in shown) ...[
+                  ListTile(
+                    leading: Icon(_iconFor(x.kind)),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ExpenseDetailPage(expenseId: x.id))),
+                    title: Row(children: [
+                      Flexible(child: Text(x.description, overflow: TextOverflow.ellipsis)),
+                      if (docs[x.id] != null) ...[const SizedBox(width: 4), Icon(Icons.attach_file, size: 16, semanticLabel: '${docs[x.id]} documents')],
+                    ]),
+                    subtitle: Text([
+                      if (names != null) names[x.vehicleId] ?? '',
+                      fmtDate(x.at),
+                      if (x.odometerKm != null) '${fmtKm(x.odometerKm!)} km',
+                      ?x.location,
+                    ].join(' · ')),
+                    trailing: Text(fmtMoney(x.cost), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ],
             );
           },
-        ))]);
+        );
       },
     );
   }

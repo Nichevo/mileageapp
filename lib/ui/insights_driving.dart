@@ -14,9 +14,11 @@ extension _Driving on _InsightsPageState {
     return _facts;
   }
 
-  Widget _drivingSection(String vid, DateTime? cutoff, String unit) {
+  /// [vid] null: every vehicle.
+  Widget _drivingSection(String? vid, DateTime? cutoff, String unit) {
     final scope = AppScope.of(context);
     return StreamBuilder<List<Trip>>(
+      key: ValueKey(vid),
       stream: scope.repo.watchTrips(vid),
       builder: (context, snap) {
         final facts = _factsOf(snap.data ?? const []);
