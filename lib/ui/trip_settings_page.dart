@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../data/database.dart';
 import 'places_page.dart';
 import '../trips/recorder.dart';
 
@@ -15,14 +16,17 @@ class TripSettingsPage extends StatefulWidget {
 
 class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBindingObserver {
   bool _location = false, _notifications = false, _background = false, _battery = false, _bluetooth = false;
-  ({String? address, String? name, bool autoStart}) _car = (address: null, name: null, autoStart: false);
+  bool _autoStart = false;
   bool _loaded = false;
+  List<Vehicle> _vehicles = const [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _check();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _check();
+    });
   }
 
   @override
@@ -38,6 +42,7 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
   }
 
   Future<void> _check() async {
+    final scope = AppScope.of(context);
     final r = await Future.wait([
       TripRecorder.hasPermission('location'),
       TripRecorder.hasPermission('notifications'),
@@ -45,7 +50,11 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
       TripRecorder.batteryUnrestricted(),
       TripRecorder.hasPermission('bluetooth'),
     ]);
+    final settings = scope.settings;
+    final repo = scope.repo;
+    await TripRecorder.syncCars(settings);
     final car = await TripRecorder.car();
+    final vehicles = await repo.vehicles();
     if (!mounted) return;
     setState(() {
       _location = r[0];
@@ -53,7 +62,8 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
       _background = r[2];
       _battery = r[3];
       _bluetooth = r[4];
-      _car = car;
+      _autoStart = car.autoStart;
+      _vehicles = vehicles;
       _loaded = true;
     });
   }
@@ -64,7 +74,9 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
     await _check();
   }
 
-  Future<void> _pickCar() async {
+  Future<void> _pickCar(Vehicle v) async {
+    final settings = AppScope.of(context).settings;
+    final mine = settings.vehicleCars[v.id];
     if (!_bluetooth && !await TripRecorder.requestPermission('bluetooth')) {
       await _check();
       return;
@@ -86,26 +98,40 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
             : ListView(
                 shrinkWrap: true,
                 children: [
-                  const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 8), child: Text('Which one is your car?')),
+                  Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: Text('Which Bluetooth is in the ${v.name}?')),
                   for (final d in devices)
                     ListTile(
-                      leading: Icon(d.address == _car.address ? Icons.check_circle : Icons.bluetooth),
+                      leading: Icon(d.address == mine?.address ? Icons.check_circle : Icons.bluetooth),
                       title: Text(d.name),
+                      subtitle: () {
+                        final other = settings.vehicleForCar(d.address);
+                        final name = _vehicles.where((x) => x.id == other && x.id != v.id).firstOrNull?.name;
+                        return name == null ? null : Text('Now linked to $name');
+                      }(),
                       onTap: () => Navigator.pop(c, d),
+                    ),
+                  if (mine != null)
+                    ListTile(
+                      leading: const Icon(Icons.link_off),
+                      title: const Text('No Bluetooth for this vehicle'),
+                      onTap: () => Navigator.pop(c, (name: '', address: '')),
                     ),
                 ],
               ),
       ),
     );
     if (picked == null) return;
-    await TripRecorder.setCar(picked.address, picked.name);
+    await settings.setVehicleCar(v.id, picked.address.isEmpty ? null : (address: picked.address, name: picked.name));
+    await TripRecorder.syncCars(settings);
     await _check();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final ready = _location && _background && _battery && _bluetooth && _car.address != null;
+    final cars = AppScope.of(context).settings.vehicleCars;
+    final anyCar = cars.isNotEmpty;
+    final ready = _location && _background && _battery && _bluetooth && anyCar;
     return Scaffold(
       appBar: AppBar(title: const Text('Auto-start with your car')),
       body: !_loaded
@@ -126,21 +152,28 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
                 }),
                 _step(5, 'Nearby devices (Bluetooth)', 'Only used to recognise the car connecting. No scanning.', _bluetooth, () => _ask('bluetooth')),
                 ListTile(
-                  leading: CircleAvatar(child: _car.address != null ? const Icon(Icons.check) : const Text('6')),
-                  title: const Text('Your car'),
-                  subtitle: Text(_car.name ?? 'Choose the car from your paired Bluetooth devices'),
-                  trailing: TextButton(onPressed: _pickCar, child: Text(_car.address == null ? 'Choose' : 'Change')),
+                  leading: CircleAvatar(child: anyCar ? const Icon(Icons.check) : const Text('6')),
+                  title: const Text('Each vehicle\'s Bluetooth'),
+                  subtitle: const Text('Trips started by a vehicle\'s Bluetooth are saved to that vehicle, and the app switches to it while you drive.'),
                 ),
+                for (final v in _vehicles)
+                  ListTile(
+                    contentPadding: const EdgeInsets.only(left: 72, right: 16),
+                    leading: Icon(cars[v.id] == null ? Icons.bluetooth_disabled : Icons.bluetooth_connected),
+                    title: Text(v.name),
+                    subtitle: Text(cars[v.id]?.name ?? 'Not linked'),
+                    trailing: TextButton(onPressed: () => _pickCar(v), child: Text(cars[v.id] == null ? 'Choose' : 'Change')),
+                  ),
                 const Divider(),
                 SwitchListTile(
                   title: const Text('Start trips automatically'),
                   subtitle: Text(ready
                       ? 'Ready'
-                      : _car.address == null
-                          ? 'Choose your car first'
+                      : !anyCar
+                          ? 'Choose a vehicle\'s Bluetooth first'
                           : 'Finish the steps above for this to work reliably'),
-                  value: _car.autoStart,
-                  onChanged: _car.address == null
+                  value: _autoStart,
+                  onChanged: !anyCar
                       ? null
                       : (v) async {
                           await TripRecorder.setAutoStart(v);

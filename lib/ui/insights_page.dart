@@ -11,6 +11,7 @@ import '../domain/energy.dart';
 import '../domain/ev_costs.dart';
 import '../domain/stats.dart';
 import 'format.dart';
+import 'vehicle_page.dart' show VehicleChip;
 
 class InsightsPage extends StatefulWidget {
   const InsightsPage({super.key});
@@ -29,7 +30,7 @@ class _InsightsPageState extends State<InsightsPage> {
     final scope = AppScope.of(context);
     final vid = scope.settings.activeVehicleId!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Insights')),
+      appBar: AppBar(title: const Text('Insights'), actions: const [VehicleChip()]),
       body: StreamBuilder<List<Vehicle>>(
         stream: scope.repo.watchVehicles(),
         builder: (context, vs) {

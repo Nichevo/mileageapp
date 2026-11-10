@@ -26,23 +26,28 @@ class CarBluetoothReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         val prefs = TripRecorderService.prefs(ctx)
         if (!prefs.getBoolean("autoStart", false)) return
-        val car = prefs.getString("carAddress", null) ?: return
+        val cars = TripRecorderService.carAddresses(ctx)
+        if (cars.isEmpty()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ctx.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) return
         @Suppress("DEPRECATION")
         val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
         val address = try { device?.address } catch (_: SecurityException) { null } ?: return
-        if (!address.equals(car, ignoreCase = true)) return
+        if (!cars.contains(address.uppercase())) return
+        // While one car's trip is recording, another car's Bluetooth (say,
+        // the second car parked in the garage) doesn't touch it.
+        val current = TripRecorderService.currentCar(ctx)
+        val sameCar = current == null || current.equals(address, ignoreCase = true)
 
         when (intent.action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 if (TripRecorderService.currentTripId(ctx) != null) {
-                    TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_CONNECTED)
+                    if (sameCar) TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_CONNECTED)
                     return
                 }
                 try {
-                    TripRecorderService.start(ctx, "bluetooth")
+                    TripRecorderService.start(ctx, "bluetooth", carAddress = address)
                 } catch (e: Exception) {
                     // Android can refuse to start location tracking from the
                     // background (battery optimisation on, or location not
@@ -51,7 +56,7 @@ class CarBluetoothReceiver : BroadcastReceiver() {
                 }
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                if (TripRecorderService.currentTripId(ctx) != null) {
+                if (TripRecorderService.currentTripId(ctx) != null && sameCar) {
                     try {
                         TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_DISCONNECTED)
                     } catch (_: Exception) {}

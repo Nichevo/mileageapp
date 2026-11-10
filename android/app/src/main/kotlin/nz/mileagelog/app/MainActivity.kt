@@ -164,6 +164,11 @@ class MainActivity : FlutterActivity() {
                     }.apply()
                     result.success(true)
                 }
+                "setCars" -> {
+                    val list = call.argument<List<String>>("addresses") ?: emptyList()
+                    prefs.edit().putString("carAddresses", org.json.JSONArray(list).toString()).apply()
+                    result.success(true)
+                }
                 "setAutoStart" -> {
                     prefs.edit().putBoolean("autoStart", call.argument<Boolean>("enabled") == true).apply()
                     result.success(true)

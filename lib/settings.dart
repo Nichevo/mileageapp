@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import 'domain/places.dart';
@@ -55,12 +57,41 @@ class Settings {
   bool get roadLookup => _p.getBool('roadLookup') ?? true;
   Future<void> setRoadLookup(bool v) => _p.setBool('roadLookup', v);
 
-  /// The car's number plate, per vehicle. Kept on the phone only.
   /// Named places (Home, Work…), as JSON. Phone only.
   List<Place> get places => Place.listFromJson(_p.getString('places'));
   Future<void> setPlaces(List<Place> p) => _p.setString('places', Place.listToJson(p));
   List<String> get dismissedPlaces => _p.getStringList('dismissedPlaces') ?? const [];
   Future<void> dismissPlace(String key) => _p.setStringList('dismissedPlaces', [...dismissedPlaces, key]);
+
+  /// Each vehicle's Bluetooth (car stereo or hands-free), by vehicle id, so
+  /// a trip started by that Bluetooth goes to the right vehicle.
+  Map<String, ({String address, String name})> get vehicleCars {
+    final raw = _p.getString('vehicleCars');
+    if (raw == null) return const {};
+    final m = jsonDecode(raw) as Map<String, dynamic>;
+    return {
+      for (final e in m.entries) e.key: (address: (e.value as Map)['address'] as String, name: (e.value as Map)['name'] as String? ?? 'Bluetooth'),
+    };
+  }
+
+  Future<void> setVehicleCar(String vehicleId, ({String address, String name})? car) async {
+    final m = {
+      for (final e in vehicleCars.entries)
+        // One Bluetooth belongs to one vehicle.
+        if (e.key != vehicleId && e.value.address.toUpperCase() != car?.address.toUpperCase()) e.key: {'address': e.value.address, 'name': e.value.name},
+    };
+    if (car != null) m[vehicleId] = {'address': car.address, 'name': car.name};
+    await _p.setString('vehicleCars', jsonEncode(m));
+  }
+
+  /// The vehicle whose Bluetooth has this address.
+  String? vehicleForCar(String? address) {
+    if (address == null) return null;
+    for (final e in vehicleCars.entries) {
+      if (e.value.address.toUpperCase() == address.toUpperCase()) return e.key;
+    }
+    return null;
+  }
 
   /// Look up weather and ground elevation for finished trips (Open-Meteo).
   bool get weatherLookup => _p.getBool('weatherLookup') ?? true;

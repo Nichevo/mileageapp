@@ -18,6 +18,7 @@ import 'trip_detail_page.dart';
 import 'trip_format.dart';
 import 'route_compare_page.dart' show RoutesPage;
 import 'trip_map.dart';
+import 'vehicle_page.dart' show VehicleChip;
 import 'places_page.dart' show askPlaceName;
 import 'trip_settings_page.dart';
 
@@ -65,7 +66,7 @@ class _TripsPageState extends State<TripsPage> {
     // When a recording has just ended (here or from the notification),
     // save it into the database.
     if (id != _currentId || id == null) {
-      await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
+      await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!, settings: scope.settings);
       lookUpRecentTrips(scope.repo, scope.settings);
     }
     final car = _car == null || id != _currentId ? await TripRecorder.car() : _car;
@@ -117,6 +118,7 @@ class _TripsPageState extends State<TripsPage> {
       appBar: AppBar(
         title: const Text('Trips'),
         actions: [
+          const VehicleChip(),
           IconButton(
             tooltip: 'Routes you drive often',
             icon: const Icon(Icons.route_outlined),

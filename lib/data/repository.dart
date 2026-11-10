@@ -332,6 +332,12 @@ class Repository {
   Future<void> setTripStatsJson(String id, String json) =>
       (db.update(db.trips)..where((t) => t.id.equals(id))).write(TripsCompanion(statsJson: Value(json)));
 
+  /// Moves a trip, and tolls or parking logged against it, to another vehicle.
+  Future<void> moveTrip(String id, String vehicleId) => db.transaction(() async {
+        await (db.update(db.trips)..where((t) => t.id.equals(id))).write(TripsCompanion(vehicleId: Value(vehicleId)));
+        await (db.update(db.expenses)..where((e) => e.tripId.equals(id))).write(ExpensesCompanion(vehicleId: Value(vehicleId)));
+      });
+
   Future<void> deleteTrip(String id) => db.transaction(() async {
         await (db.delete(db.tripPoints)..where((p) => p.tripId.equals(id))).go();
         await (db.delete(db.tripStops)..where((s) => s.tripId.equals(id))).go();

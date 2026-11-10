@@ -391,3 +391,37 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
     await scope.settings.setActiveVehicleId(picked);
   }
 }
+
+IconData vehicleIcon(String kind) => kind == 'ev' ? Icons.electric_car : Icons.directions_car;
+
+/// The current vehicle's name as a button that switches vehicle, for app bars.
+class VehicleChip extends StatelessWidget {
+  const VehicleChip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    return ValueListenableBuilder<String?>(
+      valueListenable: scope.settings.activeVehicle,
+      builder: (context, vid, _) => StreamBuilder<List<Vehicle>>(
+        stream: scope.repo.watchVehicles(),
+        builder: (context, snap) {
+          final v = snap.data?.where((x) => x.id == vid).firstOrNull;
+          if (v == null) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: ActionChip(
+              avatar: Icon(vehicleIcon(v.kind), size: 18),
+              label: Row(mainAxisSize: MainAxisSize.min, children: [
+                ConstrainedBox(constraints: const BoxConstraints(maxWidth: 140), child: Text(v.name, overflow: TextOverflow.ellipsis)),
+                const Icon(Icons.arrow_drop_down, size: 18),
+              ]),
+              tooltip: 'Switch vehicle',
+              onPressed: () => showVehicleSwitcher(context),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

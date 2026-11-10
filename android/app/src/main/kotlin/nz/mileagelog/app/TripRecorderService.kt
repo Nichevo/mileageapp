@@ -44,6 +44,8 @@ class TripRecorderService : Service(), LocationListener {
         const val ACTION_TOGGLE = "nz.mileagelog.app.TOGGLE_TRIP"
         const val EXTRA_TRIP_ID = "tripId"
         const val EXTRA_STARTED_BY = "startedBy"
+        /** Bluetooth address of the car that started the trip, if any. */
+        const val EXTRA_CAR = "carAddress"
         const val CHANNEL_ID = "trip_recording"
         const val NOTIFICATION_ID = 41
         private const val DISCONNECT_GRACE_MS = 120_000L
@@ -52,13 +54,29 @@ class TripRecorderService : Service(), LocationListener {
         fun prefs(ctx: Context) = ctx.getSharedPreferences("mileagelog_native", Context.MODE_PRIVATE)
         fun currentTripId(ctx: Context): String? = prefs(ctx).getString("currentTripId", null)
 
-        fun start(ctx: Context, startedBy: String, tripId: String? = null) {
+        fun start(ctx: Context, startedBy: String, tripId: String? = null, carAddress: String? = null) {
             val i = Intent(ctx, TripRecorderService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_TRIP_ID, tripId ?: UUID.randomUUID().toString())
                 .putExtra(EXTRA_STARTED_BY, startedBy)
+            if (carAddress != null) i.putExtra(EXTRA_CAR, carAddress)
             ctx.startForegroundService(i)
         }
+
+        /** Every car's Bluetooth address that may start a trip. */
+        fun carAddresses(ctx: Context): Set<String> {
+            val p = prefs(ctx)
+            val out = mutableSetOf<String>()
+            p.getString("carAddress", null)?.let { out.add(it.uppercase()) }
+            try {
+                val arr = org.json.JSONArray(p.getString("carAddresses", "[]"))
+                for (i in 0 until arr.length()) out.add(arr.getString(i).uppercase())
+            } catch (_: Exception) {}
+            return out
+        }
+
+        /** Car that started the trip in progress, or null for a manual trip. */
+        fun currentCar(ctx: Context): String? = prefs(ctx).getString("currentCarAddress", null)
 
         fun send(ctx: Context, action: String) {
             ctx.startService(Intent(ctx, TripRecorderService::class.java).setAction(action))
@@ -106,7 +124,7 @@ class TripRecorderService : Service(), LocationListener {
             ACTION_START -> {
                 val id = intent.getStringExtra(EXTRA_TRIP_ID) ?: UUID.randomUUID().toString()
                 val by = intent.getStringExtra(EXTRA_STARTED_BY) ?: "manual"
-                startTrip(id, by)
+                startTrip(id, by, intent.getStringExtra(EXTRA_CAR))
             }
             ACTION_STOP -> stopTrip()
             ACTION_CAR_DISCONNECTED -> if (tripId != null) {
@@ -122,7 +140,7 @@ class TripRecorderService : Service(), LocationListener {
                     if (goForeground("Stopping…")) stopTrip() else stopSelf()
                     if (tripId == null && currentTripId(this) != null) {
                         // Service was restarted without the trip in memory.
-                        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").apply()
+                        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("currentCarAddress").apply()
                         HomeWidgets.updateTrip(this)
                     }
                 } else {
@@ -133,14 +151,14 @@ class TripRecorderService : Service(), LocationListener {
                 // Restarted by the system after being killed: resume the trip
                 // that was in progress, if any.
                 val id = currentTripId(this)
-                if (id != null) startTrip(id, prefs(this).getString("currentStartedBy", "manual")!!) else stopSelf()
+                if (id != null) startTrip(id, prefs(this).getString("currentStartedBy", "manual")!!, currentCar(this)) else stopSelf()
             }
         }
         return START_STICKY
     }
 
     @SuppressLint("MissingPermission")
-    private fun startTrip(id: String, startedBy: String) {
+    private fun startTrip(id: String, startedBy: String, carAddress: String? = null) {
         if (tripId == id) return
         if (tripId != null) stopTrip(keepService = true)
 
@@ -165,7 +183,9 @@ class TripRecorderService : Service(), LocationListener {
         tripId = id
         // Mark the trip current before its files appear, so the app never
         // mistakes a just-started trip for an abandoned one.
-        prefs(this).edit().putString("currentTripId", id).putString("currentStartedBy", startedBy).commit()
+        prefs(this).edit().putString("currentTripId", id).putString("currentStartedBy", startedBy).apply {
+            if (carAddress != null) putString("currentCarAddress", carAddress) else remove("currentCarAddress")
+        }.commit()
         val meta = File(tripsDir(this), "$id.meta.json")
         val csv = File(tripsDir(this), "$id.csv")
         if (meta.exists()) {
@@ -175,6 +195,7 @@ class TripRecorderService : Service(), LocationListener {
         } else {
             startedAtMs = System.currentTimeMillis()
             val m = JSONObject().put("id", id).put("startAt", startedAtMs).put("startedBy", startedBy)
+            if (carAddress != null) m.put("carAddress", carAddress)
             batteryPct()?.let { m.put("batteryStart", it) }
             if (isCharging()) m.put("charging", true)
             meta.writeText(m.toString())
@@ -218,7 +239,7 @@ class TripRecorderService : Service(), LocationListener {
         }
         tripId = null
         chargedDuringTrip = false
-        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("liveKm").remove("liveStartMs").apply()
+        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("currentCarAddress").remove("liveKm").remove("liveStartMs").apply()
         HomeWidgets.updateTrip(this)
         if (!keepService) {
             stopForeground(STOP_FOREGROUND_REMOVE)

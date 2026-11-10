@@ -25,6 +25,7 @@ import 'toll_form.dart';
 import 'trip_format.dart';
 import 'route_compare_page.dart';
 import 'trip_map.dart';
+import 'vehicle_page.dart' show vehicleIcon;
 import 'trips_page.dart' show BandBar;
 
 class TripDetailPage extends StatefulWidget {
@@ -212,6 +213,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                             '${trip.startedBy == 'bluetooth' ? ' · started by Bluetooth' : ''}',
                             style: t.bodyMedium,
                           ),
+                          _vehicleRow(context, trip),
                           if (trip.status == 'done') _endsRow(context),
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
@@ -233,6 +235,60 @@ class _TripDetailPageState extends State<TripDetailPage> {
   }
 
   Map<String, Object?> _statsJson = const {};
+
+  /// Which vehicle the trip was in, with a way to move it to another.
+  Widget _vehicleRow(BuildContext context, Trip trip) {
+    final scope = AppScope.of(context);
+    return StreamBuilder<List<Vehicle>>(
+      stream: scope.repo.watchVehicles(),
+      builder: (context, snap) {
+        final vehicles = snap.data ?? const <Vehicle>[];
+        final v = vehicles.where((x) => x.id == trip.vehicleId).firstOrNull;
+        if (v == null) return const SizedBox.shrink();
+        final car = scope.settings.vehicleCars[v.id];
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            ActionChip(
+              avatar: Icon(vehicleIcon(v.kind), size: 18),
+              label: Text(v.name),
+              tooltip: vehicles.length > 1 ? 'Move to another vehicle' : null,
+              onPressed: vehicles.length < 2 ? null : () => _moveTrip(trip, vehicles),
+            ),
+            if (trip.startedBy == 'bluetooth' && car != null) Text('via ${car.name}', style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        );
+      },
+    );
+  }
+
+  Future<void> _moveTrip(Trip trip, List<Vehicle> vehicles) async {
+    final scope = AppScope.of(context);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 8), child: Text('Which vehicle was this trip in?')),
+          for (final v in vehicles)
+            ListTile(
+              leading: Icon(vehicleIcon(v.kind)),
+              title: Text(v.name),
+              trailing: v.id == trip.vehicleId ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(c, v.id),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null || picked == trip.vehicleId) return;
+    await scope.repo.moveTrip(trip.id, picked);
+    _compare = null;
+    if (mounted) {
+      final name = vehicles.firstWhere((v) => v.id == picked).name;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Trip moved to $name')));
+      setState(() {});
+    }
+  }
 
   /// Where the trip started and ended: the place name, or a chip to name it.
   Widget _endsRow(BuildContext context) {

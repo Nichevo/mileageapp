@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/trip_stats.dart';
+import '../settings.dart';
 
 /// Talks to the native Android recorder (TripRecorderService) and turns its
 /// finished recordings into database rows.
@@ -47,6 +48,22 @@ class TripRecorder {
   static Future<void> setCar(String? address, String? name) => _ch.invokeMethod('setCar', {'address': address, 'name': name});
   static Future<void> setAutoStart(bool enabled) => _ch.invokeMethod('setAutoStart', {'enabled': enabled});
 
+  /// Tells the recorder which Bluetooth devices start trips: one per vehicle.
+  /// The single car chosen in older versions is moved onto the current
+  /// vehicle the first time.
+  static Future<void> syncCars(Settings settings) async {
+    if (!supported) return;
+    final old = await car();
+    if (old.address != null) {
+      final vid = settings.activeVehicleId;
+      if (settings.vehicleForCar(old.address) == null && vid != null && !settings.vehicleCars.containsKey(vid)) {
+        await settings.setVehicleCar(vid, (address: old.address!, name: old.name ?? 'Car'));
+      }
+      await setCar(null, null);
+    }
+    await _ch.invokeMethod('setCars', {'addresses': [for (final c in settings.vehicleCars.values) c.address]});
+  }
+
   /// Starts a manual trip after making sure the essentials are granted.
   /// Returns an error message, or null when recording started.
   static Future<String?> startManual() async {
@@ -73,7 +90,9 @@ class TripRecorder {
   /// with their points, stops and stats and their files removed; the one in
   /// progress gets (or keeps) a 'recording' row so it shows in the list.
   /// Returns the number of trips finished by this call.
-  static Future<int> ingest(Repository repo, String vehicleId) async {
+  /// A trip started by a vehicle's Bluetooth goes to that vehicle; while one
+  /// is recording, the app switches to that vehicle.
+  static Future<int> ingest(Repository repo, String vehicleId, {Settings? settings}) async {
     if (!supported) return 0;
     final dir = Directory(await tripsDir());
     if (!await dir.exists()) return 0;
@@ -89,12 +108,15 @@ class TripRecorder {
       final startedBy = meta['startedBy'] as String? ?? 'manual';
       final existing = await repo.trip(id);
       final ended = meta['endAt'] != null || id != current;
+      final carVehicle = settings?.vehicleForCar(meta['carAddress'] as String?);
+      final tripVehicle = existing?.vehicleId ?? carVehicle ?? vehicleId;
 
       if (!ended) {
+        if (carVehicle != null && carVehicle != settings!.activeVehicleId) await settings.setActiveVehicleId(carVehicle);
         if (existing == null) {
           await repo.upsertTrip(TripsCompanion.insert(
             id: id,
-            vehicleId: vehicleId,
+            vehicleId: tripVehicle,
             name: defaultName(startAt),
             startAt: startAt,
             status: const Value('recording'),
@@ -117,7 +139,7 @@ class TripRecorder {
         await repo.saveRecordedTrip(
           TripsCompanion.insert(
             id: id,
-            vehicleId: existing?.vehicleId ?? vehicleId,
+            vehicleId: tripVehicle,
             name: existing?.name ?? defaultName(startAt),
             startAt: startAt,
             endAt: Value(endAt),

@@ -122,7 +122,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     }
     try {
       await _handleLaunchAction();
-      await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!);
+      await TripRecorder.syncCars(scope.settings);
+      await TripRecorder.ingest(scope.repo, scope.settings.activeVehicleId!, settings: scope.settings);
       lookUpRecentTrips(scope.repo, scope.settings);
       if (await TripRecorder.consumeStartRequest()) {
         if (mounted) setState(() => _index = 2);
