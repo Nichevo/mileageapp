@@ -27,6 +27,26 @@ Future<String?> askPlaceName(BuildContext context, {String initial = ''}) async 
   return ok == true && ctl.text.trim().isNotEmpty ? ctl.text.trim() : null;
 }
 
+/// Home, Work or any other name. Returns null on cancel.
+Future<String?> pickPlaceName(BuildContext context, {Set<String> taken = const {}, String title = 'Name this place'}) async {
+  final pick = await showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    builder: (c) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 8), child: Text(title, style: Theme.of(c).textTheme.titleMedium)),
+        for (final (n, icon) in [('Home', Icons.home_outlined), ('Work', Icons.work_outline)])
+          if (!taken.contains(n)) ListTile(leading: Icon(icon), title: Text(n), onTap: () => Navigator.pop(c, n)),
+        ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Other name…'), onTap: () => Navigator.pop(c, '')),
+      ]),
+    ),
+  );
+  if (pick == null) return null;
+  if (pick.isNotEmpty) return pick;
+  if (!context.mounted) return null;
+  return askPlaceName(context);
+}
+
 /// Your named places: rename or remove them.
 class PlacesPage extends StatefulWidget {
   const PlacesPage({super.key});
@@ -44,7 +64,7 @@ class _PlacesPageState extends State<PlacesPage> {
       body: places.isEmpty
           ? const Padding(
               padding: EdgeInsets.all(24),
-              child: Text('No places yet. Once a few trips start or end at the same spot, the Trips page asks you to name it.'),
+              child: Text('No places yet. Once two or more trips start or end at the same spot, the Trips page offers to name it. You can also name either end of any trip from its page.'),
             )
           : ListView(children: [
               for (final p in places)

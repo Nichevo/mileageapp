@@ -20,6 +20,7 @@ import '../trips/road_lookup.dart';
 import '../trips/route_compare_service.dart';
 import '../trips/weather_lookup.dart';
 import 'format.dart';
+import 'places_page.dart' show pickPlaceName;
 import 'toll_form.dart';
 import 'trip_format.dart';
 import 'route_compare_page.dart';
@@ -211,6 +212,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                             '${trip.startedBy == 'bluetooth' ? ' · started by Bluetooth' : ''}',
                             style: t.bodyMedium,
                           ),
+                          if (trip.status == 'done') _endsRow(context),
                           if (trip.notes != null) ...[const SizedBox(height: 6), Text(trip.notes!, style: t.bodyMedium)],
                           const SizedBox(height: 16),
                           if (_stats != null) ..._statsSection(context, _stats!, road, TripBattery.from(trip.statsJson)) else _reportSection(context, trip),
@@ -231,6 +233,38 @@ class _TripDetailPageState extends State<TripDetailPage> {
   }
 
   Map<String, Object?> _statsJson = const {};
+
+  /// Where the trip started and ended: the place name, or a chip to name it.
+  Widget _endsRow(BuildContext context) {
+    final pts = _accurate;
+    if (pts.length < 2) return const SizedBox.shrink();
+    final settings = AppScope.of(context).settings;
+    Widget end(String label, TripPoint p) {
+      final pl = placeAt((lat: p.lat, lon: p.lon), settings.places);
+      if (pl != null) return Chip(avatar: const Icon(Icons.place_outlined, size: 18), label: Text('$label ${pl.name}'));
+      return ActionChip(
+        avatar: const Icon(Icons.add_location_alt_outlined, size: 18),
+        label: Text(label == 'From' ? 'Name the start' : 'Name the destination'),
+        onPressed: () async {
+          final n = await pickPlaceName(
+            context,
+            taken: settings.places.map((x) => x.name).toSet(),
+            title: label == 'From' ? 'Name where this trip started' : 'Name where this trip ended',
+          );
+          if (n == null || n.trim().isEmpty) return;
+          await settings.setPlaces([...settings.places, Place(newId(), n.trim(), p.lat, p.lon)]);
+          if (mounted) setState(() {});
+        },
+      );
+    }
+
+    final first = pts.first, last = pts.last;
+    final roundTrip = haversineKm(first.lat, first.lon, last.lat, last.lon) * 1000 <= placeRadiusM;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(spacing: 8, runSpacing: 4, children: [end('From', first), if (!roundTrip) end('To', last)]),
+    );
+  }
   Future<List<StretchResult>>? _compare;
 
   /// Stretches of this trip that other trips also drove.

@@ -117,6 +117,8 @@ void main() {
 
   testWidgets('trips list sorts, filters and merges selected trips', (tester) async {
     SharedPreferences.setMockInitialValues({'roadLookup': false});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/path_provider'), (_) async => Directory.systemTemp.path);
     final db = AppDatabase(NativeDatabase.memory());
     final repo = Repository(db);
     final settings = await Settings.load();

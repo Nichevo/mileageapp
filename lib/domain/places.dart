@@ -42,8 +42,8 @@ Place? placeAt(LatLon? p, List<Place> places) {
 }
 
 /// Spots where trips often start or end that aren't named yet: clusters of
-/// at least [minCount] trip ends within [radiusM], biggest first.
-List<({LatLon at, int count})> suggestPlaces(List<LatLon> ends, List<Place> places, {int minCount = 3, double radiusM = 150}) {
+/// at least [minCount] trip starts or ends within [radiusM], biggest first.
+List<({LatLon at, int count})> suggestPlaces(List<LatLon> ends, List<Place> places, {int minCount = 2, double radiusM = 150}) {
   final clusters = <({List<LatLon> pts})>[];
   for (final e in ends) {
     if (placeAt(e, places) != null) continue;

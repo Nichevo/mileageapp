@@ -41,7 +41,7 @@ Weather and elevation (`lib/domain/trip_weather.dart`, `lib/trips/weather_lookup
 
 Comparing trips (`lib/domain/route_compare.dart`, `lib/trips/route_compare_service.dart`): each route is resampled every 50 m and matched against other trips' points within 40 m heading the same way, allowing 300 m gaps. Runs of 2 km or more are shared stretches, so trips only need to overlap in part. A trip page lists the stretches other trips also drove (time, rank, usual time), and a comparison page charts time, speeds, stops and red lights over the dates, with medians for weekday peaks, other times, weekends, rain and dry. Trips > Routes lists the most-driven stretches. Matching runs on the phone in a background isolate; nothing is sent anywhere.
 
-Places (`lib/domain/places.dart`): when three or more trips start or end within about 150 m of each other, the Trips page offers to name the spot (Home, Work or any name). Trips that still have their automatic name are then titled "Home → Work" and can be filtered by place. Places are kept in the app's settings on the phone only.
+Places (`lib/domain/places.dart`): when two or more trips start or end within about 150 m of each other, the Trips page offers to name the spot (Home, Work or any name). Trips that still have their automatic name are then titled "Home → Work" and can be filtered by place. Either end of any trip can also be named from the trip page. Places are kept in the app's settings on the phone only.
 
 ## Privacy rules for this repository
 
