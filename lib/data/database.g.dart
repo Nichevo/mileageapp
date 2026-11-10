@@ -128,6 +128,40 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _ownershipMeta = const VerificationMeta(
+    'ownership',
+  );
+  @override
+  late final GeneratedColumn<String> ownership = GeneratedColumn<String>(
+    'ownership',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('own'),
+  );
+  static const VerificationMeta _archivedAtMeta = const VerificationMeta(
+    'archivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archivedAt = GeneratedColumn<DateTime>(
+    'archived_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _loanJsonMeta = const VerificationMeta(
+    'loanJson',
+  );
+  @override
+  late final GeneratedColumn<String> loanJson = GeneratedColumn<String>(
+    'loan_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -142,6 +176,9 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
     purchaseDate,
     notes,
     createdAt,
+    ownership,
+    archivedAt,
+    loanJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -237,6 +274,24 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('ownership')) {
+      context.handle(
+        _ownershipMeta,
+        ownership.isAcceptableOrUnknown(data['ownership']!, _ownershipMeta),
+      );
+    }
+    if (data.containsKey('archived_at')) {
+      context.handle(
+        _archivedAtMeta,
+        archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
+      );
+    }
+    if (data.containsKey('loan_json')) {
+      context.handle(
+        _loanJsonMeta,
+        loanJson.isAcceptableOrUnknown(data['loan_json']!, _loanJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -294,6 +349,18 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      ownership: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ownership'],
+      )!,
+      archivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archived_at'],
+      ),
+      loanJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}loan_json'],
+      ),
     );
   }
 
@@ -322,6 +389,15 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
   final DateTime? purchaseDate;
   final String? notes;
   final DateTime createdAt;
+
+  /// v6: 'own', 'loan' or 'rental'.
+  final String ownership;
+
+  /// v6: set when handed back (loan, rental) or sold; hidden from lists.
+  final DateTime? archivedAt;
+
+  /// v6: loan or rental details (LoanDetails as JSON).
+  final String? loanJson;
   const Vehicle({
     required this.id,
     required this.name,
@@ -335,6 +411,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     this.purchaseDate,
     this.notes,
     required this.createdAt,
+    required this.ownership,
+    this.archivedAt,
+    this.loanJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -367,6 +446,13 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       map['notes'] = Variable<String>(notes);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['ownership'] = Variable<String>(ownership);
+    if (!nullToAbsent || archivedAt != null) {
+      map['archived_at'] = Variable<DateTime>(archivedAt);
+    }
+    if (!nullToAbsent || loanJson != null) {
+      map['loan_json'] = Variable<String>(loanJson);
+    }
     return map;
   }
 
@@ -396,6 +482,13 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
           ? const Value.absent()
           : Value(notes),
       createdAt: Value(createdAt),
+      ownership: Value(ownership),
+      archivedAt: archivedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivedAt),
+      loanJson: loanJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(loanJson),
     );
   }
 
@@ -417,6 +510,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       purchaseDate: serializer.fromJson<DateTime?>(json['purchaseDate']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      ownership: serializer.fromJson<String>(json['ownership']),
+      archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
+      loanJson: serializer.fromJson<String?>(json['loanJson']),
     );
   }
   @override
@@ -435,6 +531,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       'purchaseDate': serializer.toJson<DateTime?>(purchaseDate),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'ownership': serializer.toJson<String>(ownership),
+      'archivedAt': serializer.toJson<DateTime?>(archivedAt),
+      'loanJson': serializer.toJson<String?>(loanJson),
     };
   }
 
@@ -451,6 +550,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     Value<DateTime?> purchaseDate = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
+    String? ownership,
+    Value<DateTime?> archivedAt = const Value.absent(),
+    Value<String?> loanJson = const Value.absent(),
   }) => Vehicle(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -466,6 +568,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     purchaseDate: purchaseDate.present ? purchaseDate.value : this.purchaseDate,
     notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
+    ownership: ownership ?? this.ownership,
+    archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
+    loanJson: loanJson.present ? loanJson.value : this.loanJson,
   );
   Vehicle copyWithCompanion(VehiclesCompanion data) {
     return Vehicle(
@@ -487,6 +592,11 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
           : this.purchaseDate,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      ownership: data.ownership.present ? data.ownership.value : this.ownership,
+      archivedAt: data.archivedAt.present
+          ? data.archivedAt.value
+          : this.archivedAt,
+      loanJson: data.loanJson.present ? data.loanJson.value : this.loanJson,
     );
   }
 
@@ -504,7 +614,10 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
           ..write('startOdometerKm: $startOdometerKm, ')
           ..write('purchaseDate: $purchaseDate, ')
           ..write('notes: $notes, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('ownership: $ownership, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('loanJson: $loanJson')
           ..write(')'))
         .toString();
   }
@@ -523,6 +636,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     purchaseDate,
     notes,
     createdAt,
+    ownership,
+    archivedAt,
+    loanJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -539,7 +655,10 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
           other.startOdometerKm == this.startOdometerKm &&
           other.purchaseDate == this.purchaseDate &&
           other.notes == this.notes &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.ownership == this.ownership &&
+          other.archivedAt == this.archivedAt &&
+          other.loanJson == this.loanJson);
 }
 
 class VehiclesCompanion extends UpdateCompanion<Vehicle> {
@@ -555,6 +674,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
   final Value<DateTime?> purchaseDate;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
+  final Value<String> ownership;
+  final Value<DateTime?> archivedAt;
+  final Value<String?> loanJson;
   final Value<int> rowid;
   const VehiclesCompanion({
     this.id = const Value.absent(),
@@ -569,6 +691,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     this.purchaseDate = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.ownership = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    this.loanJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   VehiclesCompanion.insert({
@@ -584,6 +709,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     this.purchaseDate = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.ownership = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    this.loanJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -600,6 +728,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     Expression<DateTime>? purchaseDate,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
+    Expression<String>? ownership,
+    Expression<DateTime>? archivedAt,
+    Expression<String>? loanJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -615,6 +746,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
       if (purchaseDate != null) 'purchase_date': purchaseDate,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
+      if (ownership != null) 'ownership': ownership,
+      if (archivedAt != null) 'archived_at': archivedAt,
+      if (loanJson != null) 'loan_json': loanJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -632,6 +766,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     Value<DateTime?>? purchaseDate,
     Value<String?>? notes,
     Value<DateTime>? createdAt,
+    Value<String>? ownership,
+    Value<DateTime?>? archivedAt,
+    Value<String?>? loanJson,
     Value<int>? rowid,
   }) {
     return VehiclesCompanion(
@@ -647,6 +784,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
       purchaseDate: purchaseDate ?? this.purchaseDate,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      ownership: ownership ?? this.ownership,
+      archivedAt: archivedAt ?? this.archivedAt,
+      loanJson: loanJson ?? this.loanJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -690,6 +830,15 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (ownership.present) {
+      map['ownership'] = Variable<String>(ownership.value);
+    }
+    if (archivedAt.present) {
+      map['archived_at'] = Variable<DateTime>(archivedAt.value);
+    }
+    if (loanJson.present) {
+      map['loan_json'] = Variable<String>(loanJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -711,6 +860,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
           ..write('purchaseDate: $purchaseDate, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
+          ..write('ownership: $ownership, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('loanJson: $loanJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9821,6 +9973,9 @@ typedef $$VehiclesTableCreateCompanionBuilder =
       Value<DateTime?> purchaseDate,
       Value<String?> notes,
       Value<DateTime> createdAt,
+      Value<String> ownership,
+      Value<DateTime?> archivedAt,
+      Value<String?> loanJson,
       Value<int> rowid,
     });
 typedef $$VehiclesTableUpdateCompanionBuilder =
@@ -9837,6 +9992,9 @@ typedef $$VehiclesTableUpdateCompanionBuilder =
       Value<DateTime?> purchaseDate,
       Value<String?> notes,
       Value<DateTime> createdAt,
+      Value<String> ownership,
+      Value<DateTime?> archivedAt,
+      Value<String?> loanJson,
       Value<int> rowid,
     });
 
@@ -10064,6 +10222,21 @@ class $$VehiclesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownership => $composableBuilder(
+    column: $table.ownership,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get loanJson => $composableBuilder(
+    column: $table.loanJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10336,6 +10509,21 @@ class $$VehiclesTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get ownership => $composableBuilder(
+    column: $table.ownership,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get loanJson => $composableBuilder(
+    column: $table.loanJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$VehiclesTableAnnotationComposer
@@ -10388,6 +10576,17 @@ class $$VehiclesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get ownership =>
+      $composableBuilder(column: $table.ownership, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get loanJson =>
+      $composableBuilder(column: $table.loanJson, builder: (column) => column);
 
   Expression<T> attachmentsRefs<T extends Object>(
     Expression<T> Function($$AttachmentsTableAnnotationComposer a) f,
@@ -10640,6 +10839,9 @@ class $$VehiclesTableTableManager
                 Value<DateTime?> purchaseDate = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String> ownership = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                Value<String?> loanJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VehiclesCompanion(
                 id: id,
@@ -10654,6 +10856,9 @@ class $$VehiclesTableTableManager
                 purchaseDate: purchaseDate,
                 notes: notes,
                 createdAt: createdAt,
+                ownership: ownership,
+                archivedAt: archivedAt,
+                loanJson: loanJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10670,6 +10875,9 @@ class $$VehiclesTableTableManager
                 Value<DateTime?> purchaseDate = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String> ownership = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                Value<String?> loanJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VehiclesCompanion.insert(
                 id: id,
@@ -10684,6 +10892,9 @@ class $$VehiclesTableTableManager
                 purchaseDate: purchaseDate,
                 notes: notes,
                 createdAt: createdAt,
+                ownership: ownership,
+                archivedAt: archivedAt,
+                loanJson: loanJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

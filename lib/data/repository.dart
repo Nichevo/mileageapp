@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/stats.dart';
+import '../domain/loan.dart';
 import '../domain/trip_stats.dart';
 import '../import/roadtrip_csv.dart';
 import '../import/sheet_csv.dart';
@@ -46,6 +47,55 @@ class Repository {
   }
 
   Future<void> saveVehicle(VehiclesCompanion v) => db.into(db.vehicles).insertOnConflictUpdate(v);
+
+  /// Vehicles not archived (handed back or sold), oldest first.
+  Future<List<Vehicle>> liveVehicles() =>
+      (db.select(db.vehicles)..where((v) => v.archivedAt.isNull())..orderBy([(v) => OrderingTerm.asc(v.createdAt)])).get();
+
+  Stream<List<Vehicle>> watchArchivedVehicles() =>
+      (db.select(db.vehicles)..where((v) => v.archivedAt.isNotNull())..orderBy([(v) => OrderingTerm.desc(v.archivedAt)])).watch();
+
+  Future<void> setArchived(String id, bool archived) => (db.update(db.vehicles)..where((v) => v.id.equals(id)))
+      .write(VehiclesCompanion(archivedAt: Value(archived ? DateTime.now() : null)));
+
+  /// Saves a loan or rental car (new or edited).
+  Future<Vehicle> saveLoanCar({String? id, required String name, required String kind, String? make, String? model, required LoanDetails loan}) async {
+    final vid = id ?? newId();
+    final existing = id == null ? null : await vehicle(id);
+    await db.into(db.vehicles).insertOnConflictUpdate(VehiclesCompanion.insert(
+          id: vid,
+          name: name,
+          kind: Value(kind),
+          make: Value(make),
+          model: Value(model),
+          tankSize: Value(existing?.tankSize),
+          ratedEconomy: Value(existing?.ratedEconomy),
+          ownership: Value(loan.kind),
+          loanJson: Value(loan.encode()),
+          archivedAt: Value(existing?.archivedAt),
+          createdAt: existing == null ? const Value.absent() : Value(existing.createdAt),
+        ));
+    return (await vehicle(vid))!;
+  }
+
+  /// Records the hand-back and archives the car.
+  Future<void> handBack(String vehicleId, LoanDetails returned) => (db.update(db.vehicles)..where((v) => v.id.equals(vehicleId)))
+      .write(VehiclesCompanion(loanJson: Value(returned.encode()), archivedAt: Value(returned.returnedAt ?? DateTime.now())));
+
+  /// Trips, fuel and tolls while you had a loan or rental car.
+  Future<LoanSummary> loanSummary(String vehicleId, LoanDetails loan) async {
+    final trips = await (db.select(db.trips)..where((t) => t.vehicleId.equals(vehicleId) & t.status.equals('done'))).get();
+    final events = await (db.select(db.energyEvents)..where((e) => e.vehicleId.equals(vehicleId))).get();
+    final other = await (db.select(db.expenses)..where((e) => e.vehicleId.equals(vehicleId))).get();
+    return summariseLoan(
+      loan,
+      trips: trips.length,
+      tripKm: trips.fold(0.0, (a, t) => a + (t.gpsDistanceKm ?? 0)),
+      fuelLitres: events.where((e) => e.kind == 'fuel').fold(0.0, (a, e) => a + e.quantity),
+      fuelCost: events.fold(0.0, (a, e) => a + e.cost),
+      otherCost: other.fold(0.0, (a, e) => a + e.cost),
+    );
+  }
 
   Future<Vehicle> addVehicle(String name, String kind) async {
     final id = newId();
@@ -96,6 +146,8 @@ class Repository {
 
   Future<void> upsertEvent(EnergyEventsCompanion e, {bool enqueue = true}) async {
     await db.into(db.energyEvents).insertOnConflictUpdate(e);
+    // Loan and rental cars' fill-ups stay out of your Google Sheet.
+    if (enqueue && e.vehicleId.present && (await vehicle(e.vehicleId.value))?.ownership != 'own') enqueue = false;
     if (enqueue && e.id.present) await _enqueue('energy_events', e.id.value);
   }
 

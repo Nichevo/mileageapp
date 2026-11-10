@@ -11,6 +11,7 @@ import '../domain/energy.dart';
 import '../domain/ev_costs.dart';
 import '../vehicle/carjam_client.dart';
 import 'format.dart';
+import 'loan_car_page.dart' show LoanCarPage, PastVehiclesPage;
 
 class VehiclePage extends StatefulWidget {
   /// For tests: the HTTP client used for CarJam lookups.
@@ -69,6 +70,35 @@ class _VehiclePageState extends State<VehiclePage> {
       _rated.text = v.ratedEconomy?.toString() ?? '';
       _notes.text = v.notes ?? '';
     });
+  }
+
+  /// Hides a sold car from everyday lists; its history stays in Past vehicles.
+  Future<void> _archive() async {
+    final scope = AppScope.of(context);
+    final v = _v;
+    if (v == null) return;
+    final others = [for (final x in await scope.repo.liveVehicles()) if (x.id != v.id) x];
+    if (!mounted) return;
+    if (others.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add your next vehicle first, then archive this one.')));
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Archive ${v.name}?'),
+        content: const Text('It leaves the vehicle list, reminders and widgets. Its fill-ups and trips are kept under Vehicles > Past vehicles, and you can bring it back.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Archive')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await scope.repo.setArchived(v.id, true);
+    if (scope.settings.vehicleCars.containsKey(v.id)) await scope.settings.setVehicleCar(v.id, null);
+    await scope.settings.setActiveVehicleId((others.where((x) => x.ownership == 'own').firstOrNull ?? others.first).id);
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _save() async {
@@ -274,6 +304,11 @@ class _VehiclePageState extends State<VehiclePage> {
                     icon: const Icon(Icons.add),
                     label: const Text('Add another vehicle'),
                   ),
+                  TextButton.icon(
+                    onPressed: _archive,
+                    icon: const Icon(Icons.archive_outlined),
+                    label: const Text('Archive this vehicle (sold or gone)'),
+                  ),
                 ],
               ],
             ),
@@ -352,9 +387,9 @@ Future<void> applyExpiryDates(Repository repo, String vehicleId, {DateTime? wofE
 /// Bottom sheet listing your vehicles: tap one to switch, or add another.
 Future<void> showVehicleSwitcher(BuildContext context) async {
   final scope = AppScope.of(context);
-  final vehicles = await scope.repo.vehicles();
+  final vehicles = await scope.repo.liveVehicles();
+  final past = (await scope.repo.vehicles()).length - vehicles.length;
   if (!context.mounted) return;
-  vehicles.sort((a, b) => a.createdAt.compareTo(b.createdAt));
   final picked = await showModalBottomSheet<String>(
     context: context,
     showDragHandle: true,
@@ -362,9 +397,14 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
       child: ListView(shrinkWrap: true, children: [
         for (final v in vehicles)
           ListTile(
-            leading: Icon(v.kind == 'ev' ? Icons.electric_car : Icons.directions_car),
+            leading: Icon(v.ownership == 'own' ? vehicleIcon(v.kind) : Icons.car_rental),
             title: Text(v.name),
-            subtitle: Text([vehicleKindLabel(v.kind), ?v.make, ?v.model].join(' · ')),
+            subtitle: Text([
+              if (v.ownership != 'own') v.ownership == 'rental' ? 'Rental' : 'Loan car',
+              vehicleKindLabel(v.kind),
+              ?v.make,
+              ?v.model,
+            ].join(' · ')),
             trailing: v.id == scope.settings.activeVehicleId ? const Icon(Icons.check) : null,
             onTap: () => Navigator.pop(c, v.id),
           ),
@@ -379,14 +419,35 @@ Future<void> showVehicleSwitcher(BuildContext context) async {
           subtitle: const Text('Petrol, diesel, hybrid, plug-in hybrid or electric'),
           onTap: () => Navigator.pop(c, '+'),
         ),
+        ListTile(
+          leading: const Icon(Icons.car_rental),
+          title: const Text('Add a loan or rental car'),
+          subtitle: const Text('Kept separate, and archived when you hand it back'),
+          onTap: () => Navigator.pop(c, 'loan'),
+        ),
+        if (past > 0)
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: Text('Past vehicles ($past)'),
+            subtitle: const Text('Loan and rental cars handed back, and archived vehicles'),
+            onTap: () => Navigator.pop(c, 'past'),
+          ),
       ]),
     ),
   );
   if (picked == null || !context.mounted) return;
   if (picked == '+') {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage(isNew: true)));
+  } else if (picked == 'loan') {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoanCarPage()));
+  } else if (picked == 'past') {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PastVehiclesPage()));
   } else if (picked == 'edit') {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VehiclePage()));
+    final current = vehicles.where((v) => v.id == scope.settings.activeVehicleId).firstOrNull;
+    if (!context.mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => current != null && current.ownership != 'own' ? LoanCarPage(vehicle: current) : const VehiclePage(),
+    ));
   } else if (picked != scope.settings.activeVehicleId) {
     await scope.settings.setActiveVehicleId(picked);
   }

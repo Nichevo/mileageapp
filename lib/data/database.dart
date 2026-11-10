@@ -30,6 +30,12 @@ class Vehicles extends Table {
   DateTimeColumn get purchaseDate => dateTime().nullable()();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  /// v6: 'own', 'loan' or 'rental'.
+  TextColumn get ownership => text().withDefault(const Constant('own'))();
+  /// v6: set when handed back (loan, rental) or sold; hidden from lists.
+  DateTimeColumn get archivedAt => dateTime().nullable()();
+  /// v6: loan or rental details (LoanDetails as JSON).
+  TextColumn get loanJson => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -318,7 +324,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -345,6 +351,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 5) {
             await m.createTable(attachments);
+          }
+          if (from < 6) {
+            await m.addColumn(vehicles, vehicles.ownership);
+            await m.addColumn(vehicles, vehicles.archivedAt);
+            await m.addColumn(vehicles, vehicles.loanJson);
           }
         },
         beforeOpen: (details) async {

@@ -54,7 +54,7 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
     final repo = scope.repo;
     await TripRecorder.syncCars(settings);
     final car = await TripRecorder.car();
-    final vehicles = await repo.vehicles();
+    final vehicles = await repo.liveVehicles();
     if (!mounted) return;
     setState(() {
       _location = r[0];

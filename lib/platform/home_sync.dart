@@ -11,6 +11,7 @@ import '../data/repository.dart';
 import '../domain/care.dart';
 import '../domain/energy.dart';
 import '../domain/ev_costs.dart';
+import '../domain/loan.dart';
 import '../domain/reminders.dart';
 import '../trips/road_lookup.dart';
 import '../domain/stats.dart';
@@ -26,9 +27,9 @@ class HomeSync {
   static bool get supported => Platform.isAndroid;
 
   /// What the widgets show and which reminders are due, from the database.
-  static Future<({Map<String, String> snapshot, List<PlannedReminder> reminders})> build(Repository repo, Settings settings, {DateTime? now}) async {
+  static Future<({Map<String, String> snapshot, List<PlannedReminder> reminders})> build(Repository repo, Settings settings, {DateTime? now, String? vehicleId}) async {
     final n = now ?? DateTime.now();
-    final vid = settings.activeVehicleId!;
+    final vid = vehicleId ?? settings.activeVehicleId!;
     final db = repo.db;
     final vehicle = await repo.vehicle(vid);
     final events = await repo.events(vid, kind: null);
@@ -116,6 +117,15 @@ class HomeSync {
         ));
       }
     }
+    final loan = LoanDetails.decode(vehicle?.loanJson);
+    if (loan?.dueBackAt != null && !loan!.returned && vehicle?.archivedAt == null) {
+      sources.add(ReminderSource(
+        id: 'return-$vid',
+        title: 'Return ${vehicle!.name}',
+        body: 'Due back ${fmtDate(loan.dueBackAt!)}${loan.returnPlace == null ? '' : ' at ${loan.returnPlace}'}${loan.fuelPolicy == 'full_to_full' ? '. Fill the tank first.' : '.'}',
+        dueOn: loan.dueBackAt!,
+      ));
+    }
     // Toll roads used in the last week with no toll logged for the trip.
     final unpaid = <({String tripId, String road, DateTime at})>[];
     if (settings.tollReminders) {
@@ -169,11 +179,23 @@ class HomeSync {
     return (snapshot: snap, reminders: reminders);
   }
 
+  /// Reminders for every vehicle you still have, not just the one shown:
+  /// your own car's WOF still comes up while you drive a loan car.
+  static Future<List<PlannedReminder>> allReminders(Repository repo, Settings settings, List<PlannedReminder> active, {DateTime? now}) async {
+    final out = [...active];
+    for (final v in await repo.liveVehicles()) {
+      if (v.id == settings.activeVehicleId) continue;
+      final other = await build(repo, settings, now: now, vehicleId: v.id);
+      out.addAll([for (final x in other.reminders) PlannedReminder('${v.id}:${x.key}', x.at, '${v.name}: ${x.title}', x.body)]);
+    }
+    return out..sort((a, b) => a.at.compareTo(b.at));
+  }
+
   static Future<void> refresh(Repository repo, Settings settings) async {
     if (!supported || settings.activeVehicleId == null) return;
     final r = await build(repo, settings);
     await _ch.invokeMethod('updateWidgets', {'json': jsonEncode(r.snapshot)});
-    await _ch.invokeMethod('scheduleReminders', {'json': jsonEncode([for (final x in r.reminders) x.toJson()])});
+    await _ch.invokeMethod('scheduleReminders', {'json': jsonEncode([for (final x in await allReminders(repo, settings, r.reminders)) x.toJson()])});
   }
 
   static Future<String?> consumeLaunchAction() async => supported ? await _ch.invokeMethod<String>('consumeLaunchAction') : null;

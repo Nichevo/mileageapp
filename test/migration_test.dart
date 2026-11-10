@@ -26,7 +26,10 @@ void main() {
     await db.close();
 
     db = AppDatabase(NativeDatabase(file, setup: (raw) {
-      if (raw.userVersion == 5) {
+      if (raw.userVersion == 6) {
+        raw.execute('ALTER TABLE vehicles DROP COLUMN ownership');
+        raw.execute('ALTER TABLE vehicles DROP COLUMN archived_at');
+        raw.execute('ALTER TABLE vehicles DROP COLUMN loan_json');
         raw.execute('DROP TABLE attachments');
         raw.execute('DROP TABLE fuel_credits');
         raw.execute('ALTER TABLE energy_events DROP COLUMN sharetank_litres');
@@ -49,6 +52,7 @@ void main() {
     await (db.update(db.trips)..where((t) => t.id.equals('t1'))).write(const TripsCompanion(statsJson: Value('{}')));
     expect((await db.select(db.trips).getSingle()).statsJson, '{}');
     expect((await db.select(db.vehicles).get()).single.name, 'Test car');
+    expect((await db.select(db.vehicles).get()).single.ownership, 'own');
     // v3 tables exist and work.
     await db.into(db.serviceItems).insert(ServiceItemsCompanion.insert(id: 's1', vehicleId: 'v1', name: 'Oil'));
     expect((await db.select(db.serviceItems).get()).length, 1);

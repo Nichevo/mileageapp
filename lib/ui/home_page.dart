@@ -18,6 +18,7 @@ import 'vehicle_page.dart' show showVehicleSwitcher;
 import 'insights_page.dart' show ChartScale;
 import 'prices_page.dart' show FuelPriceCard;
 import 'import_page.dart';
+import 'loan_car_page.dart' show LoanBanner;
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -102,9 +103,10 @@ class _Dashboard extends StatelessWidget {
               ),
           ]),
           const SizedBox(height: 12),
+          if (vehicle != null && vehicle!.ownership != 'own') LoanBanner(vehicle: vehicle!),
           const ComingUpCard(),
           if (usesFuel(kind)) FuelPriceCard(events: events.where((e) => e.kind == 'fuel').toList()),
-          if ((latestEconomyChange(stats) ?? 0) >= 0.15)
+          if (vehicle?.ownership == 'own' && (latestEconomyChange(stats) ?? 0) >= 0.15)
             Card(
               margin: const EdgeInsets.only(bottom: 12),
               color: cs.tertiaryContainer,

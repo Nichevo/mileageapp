@@ -242,7 +242,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     return StreamBuilder<List<Vehicle>>(
       stream: scope.repo.watchVehicles(),
       builder: (context, snap) {
-        final vehicles = snap.data ?? const <Vehicle>[];
+        final vehicles = [for (final x in snap.data ?? const <Vehicle>[]) if (x.archivedAt == null || x.id == trip.vehicleId) x];
         final v = vehicles.where((x) => x.id == trip.vehicleId).firstOrNull;
         if (v == null) return const SizedBox.shrink();
         final car = scope.settings.vehicleCars[v.id];
