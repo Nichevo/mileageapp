@@ -21,6 +21,13 @@ class _ImportPageState extends State<ImportPage> {
   RoadTripExport? _roadTrip;
   SheetImportResult? _sheet;
   ImportSummary? _done;
+
+  /// Anything worth importing: fill-ups, maintenance/expenses, trips or tyres.
+  bool get _hasRows {
+    final r = _roadTrip;
+    if (r != null && (r.fuel.isNotEmpty || r.maintenance.isNotEmpty || r.trips.isNotEmpty || r.tyreSets.isNotEmpty)) return true;
+    return _sheet?.fills.isNotEmpty ?? false;
+  }
   bool _busy = false;
 
   Future<void> _pick() async {
@@ -81,7 +88,7 @@ class _ImportPageState extends State<ImportPage> {
             const SizedBox(height: 16),
             if (_done == null)
               FilledButton(
-                onPressed: _busy || ((_roadTrip?.fuel.isEmpty ?? true) && (_sheet?.fills.isEmpty ?? true)) ? null : _import,
+                onPressed: _busy || !_hasRows ? null : _import,
                 child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Import'),
               )
             else
