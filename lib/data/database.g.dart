@@ -717,6 +717,667 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
   }
 }
 
+class $AttachmentsTable extends Attachments
+    with TableInfo<$AttachmentsTable, Attachment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AttachmentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _vehicleIdMeta = const VerificationMeta(
+    'vehicleId',
+  );
+  @override
+  late final GeneratedColumn<String> vehicleId = GeneratedColumn<String>(
+    'vehicle_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES vehicles (id)',
+    ),
+  );
+  static const VerificationMeta _ownerKindMeta = const VerificationMeta(
+    'ownerKind',
+  );
+  @override
+  late final GeneratedColumn<String> ownerKind = GeneratedColumn<String>(
+    'owner_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _docTypeMeta = const VerificationMeta(
+    'docType',
+  );
+  @override
+  late final GeneratedColumn<String> docType = GeneratedColumn<String>(
+    'doc_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('other'),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  @override
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mimeTypeMeta = const VerificationMeta(
+    'mimeType',
+  );
+  @override
+  late final GeneratedColumn<String> mimeType = GeneratedColumn<String>(
+    'mime_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sizeBytesMeta = const VerificationMeta(
+    'sizeBytes',
+  );
+  @override
+  late final GeneratedColumn<int> sizeBytes = GeneratedColumn<int>(
+    'size_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _docDateMeta = const VerificationMeta(
+    'docDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> docDate = GeneratedColumn<DateTime>(
+    'doc_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _addedAtMeta = const VerificationMeta(
+    'addedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+    'added_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    vehicleId,
+    ownerKind,
+    ownerId,
+    docType,
+    title,
+    fileName,
+    mimeType,
+    sizeBytes,
+    docDate,
+    addedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'attachments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Attachment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('vehicle_id')) {
+      context.handle(
+        _vehicleIdMeta,
+        vehicleId.isAcceptableOrUnknown(data['vehicle_id']!, _vehicleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_vehicleIdMeta);
+    }
+    if (data.containsKey('owner_kind')) {
+      context.handle(
+        _ownerKindMeta,
+        ownerKind.isAcceptableOrUnknown(data['owner_kind']!, _ownerKindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerKindMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
+    }
+    if (data.containsKey('doc_type')) {
+      context.handle(
+        _docTypeMeta,
+        docType.isAcceptableOrUnknown(data['doc_type']!, _docTypeMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileNameMeta);
+    }
+    if (data.containsKey('mime_type')) {
+      context.handle(
+        _mimeTypeMeta,
+        mimeType.isAcceptableOrUnknown(data['mime_type']!, _mimeTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mimeTypeMeta);
+    }
+    if (data.containsKey('size_bytes')) {
+      context.handle(
+        _sizeBytesMeta,
+        sizeBytes.isAcceptableOrUnknown(data['size_bytes']!, _sizeBytesMeta),
+      );
+    }
+    if (data.containsKey('doc_date')) {
+      context.handle(
+        _docDateMeta,
+        docDate.isAcceptableOrUnknown(data['doc_date']!, _docDateMeta),
+      );
+    }
+    if (data.containsKey('added_at')) {
+      context.handle(
+        _addedAtMeta,
+        addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Attachment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Attachment(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      vehicleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vehicle_id'],
+      )!,
+      ownerKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_kind'],
+      )!,
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      )!,
+      docType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}doc_type'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      )!,
+      mimeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mime_type'],
+      )!,
+      sizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size_bytes'],
+      )!,
+      docDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}doc_date'],
+      ),
+      addedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}added_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AttachmentsTable createAlias(String alias) {
+    return $AttachmentsTable(attachedDatabase, alias);
+  }
+}
+
+class Attachment extends DataClass implements Insertable<Attachment> {
+  final String id;
+  final String vehicleId;
+
+  /// What it hangs off: 'expense', 'policy', or 'vehicle' (stand-alone).
+  final String ownerKind;
+  final String ownerId;
+
+  /// 'wof', 'service', 'insurance', 'rego', 'tyres', 'other'
+  final String docType;
+  final String? title;
+
+  /// File name inside the attachments folder.
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+
+  /// The document's own date (invoice date), when known.
+  final DateTime? docDate;
+  final DateTime addedAt;
+  const Attachment({
+    required this.id,
+    required this.vehicleId,
+    required this.ownerKind,
+    required this.ownerId,
+    required this.docType,
+    this.title,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    this.docDate,
+    required this.addedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['vehicle_id'] = Variable<String>(vehicleId);
+    map['owner_kind'] = Variable<String>(ownerKind);
+    map['owner_id'] = Variable<String>(ownerId);
+    map['doc_type'] = Variable<String>(docType);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    map['file_name'] = Variable<String>(fileName);
+    map['mime_type'] = Variable<String>(mimeType);
+    map['size_bytes'] = Variable<int>(sizeBytes);
+    if (!nullToAbsent || docDate != null) {
+      map['doc_date'] = Variable<DateTime>(docDate);
+    }
+    map['added_at'] = Variable<DateTime>(addedAt);
+    return map;
+  }
+
+  AttachmentsCompanion toCompanion(bool nullToAbsent) {
+    return AttachmentsCompanion(
+      id: Value(id),
+      vehicleId: Value(vehicleId),
+      ownerKind: Value(ownerKind),
+      ownerId: Value(ownerId),
+      docType: Value(docType),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      fileName: Value(fileName),
+      mimeType: Value(mimeType),
+      sizeBytes: Value(sizeBytes),
+      docDate: docDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(docDate),
+      addedAt: Value(addedAt),
+    );
+  }
+
+  factory Attachment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Attachment(
+      id: serializer.fromJson<String>(json['id']),
+      vehicleId: serializer.fromJson<String>(json['vehicleId']),
+      ownerKind: serializer.fromJson<String>(json['ownerKind']),
+      ownerId: serializer.fromJson<String>(json['ownerId']),
+      docType: serializer.fromJson<String>(json['docType']),
+      title: serializer.fromJson<String?>(json['title']),
+      fileName: serializer.fromJson<String>(json['fileName']),
+      mimeType: serializer.fromJson<String>(json['mimeType']),
+      sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
+      docDate: serializer.fromJson<DateTime?>(json['docDate']),
+      addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'vehicleId': serializer.toJson<String>(vehicleId),
+      'ownerKind': serializer.toJson<String>(ownerKind),
+      'ownerId': serializer.toJson<String>(ownerId),
+      'docType': serializer.toJson<String>(docType),
+      'title': serializer.toJson<String?>(title),
+      'fileName': serializer.toJson<String>(fileName),
+      'mimeType': serializer.toJson<String>(mimeType),
+      'sizeBytes': serializer.toJson<int>(sizeBytes),
+      'docDate': serializer.toJson<DateTime?>(docDate),
+      'addedAt': serializer.toJson<DateTime>(addedAt),
+    };
+  }
+
+  Attachment copyWith({
+    String? id,
+    String? vehicleId,
+    String? ownerKind,
+    String? ownerId,
+    String? docType,
+    Value<String?> title = const Value.absent(),
+    String? fileName,
+    String? mimeType,
+    int? sizeBytes,
+    Value<DateTime?> docDate = const Value.absent(),
+    DateTime? addedAt,
+  }) => Attachment(
+    id: id ?? this.id,
+    vehicleId: vehicleId ?? this.vehicleId,
+    ownerKind: ownerKind ?? this.ownerKind,
+    ownerId: ownerId ?? this.ownerId,
+    docType: docType ?? this.docType,
+    title: title.present ? title.value : this.title,
+    fileName: fileName ?? this.fileName,
+    mimeType: mimeType ?? this.mimeType,
+    sizeBytes: sizeBytes ?? this.sizeBytes,
+    docDate: docDate.present ? docDate.value : this.docDate,
+    addedAt: addedAt ?? this.addedAt,
+  );
+  Attachment copyWithCompanion(AttachmentsCompanion data) {
+    return Attachment(
+      id: data.id.present ? data.id.value : this.id,
+      vehicleId: data.vehicleId.present ? data.vehicleId.value : this.vehicleId,
+      ownerKind: data.ownerKind.present ? data.ownerKind.value : this.ownerKind,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      docType: data.docType.present ? data.docType.value : this.docType,
+      title: data.title.present ? data.title.value : this.title,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      mimeType: data.mimeType.present ? data.mimeType.value : this.mimeType,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      docDate: data.docDate.present ? data.docDate.value : this.docDate,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Attachment(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('ownerKind: $ownerKind, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('docType: $docType, ')
+          ..write('title: $title, ')
+          ..write('fileName: $fileName, ')
+          ..write('mimeType: $mimeType, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('docDate: $docDate, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    vehicleId,
+    ownerKind,
+    ownerId,
+    docType,
+    title,
+    fileName,
+    mimeType,
+    sizeBytes,
+    docDate,
+    addedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Attachment &&
+          other.id == this.id &&
+          other.vehicleId == this.vehicleId &&
+          other.ownerKind == this.ownerKind &&
+          other.ownerId == this.ownerId &&
+          other.docType == this.docType &&
+          other.title == this.title &&
+          other.fileName == this.fileName &&
+          other.mimeType == this.mimeType &&
+          other.sizeBytes == this.sizeBytes &&
+          other.docDate == this.docDate &&
+          other.addedAt == this.addedAt);
+}
+
+class AttachmentsCompanion extends UpdateCompanion<Attachment> {
+  final Value<String> id;
+  final Value<String> vehicleId;
+  final Value<String> ownerKind;
+  final Value<String> ownerId;
+  final Value<String> docType;
+  final Value<String?> title;
+  final Value<String> fileName;
+  final Value<String> mimeType;
+  final Value<int> sizeBytes;
+  final Value<DateTime?> docDate;
+  final Value<DateTime> addedAt;
+  final Value<int> rowid;
+  const AttachmentsCompanion({
+    this.id = const Value.absent(),
+    this.vehicleId = const Value.absent(),
+    this.ownerKind = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.docType = const Value.absent(),
+    this.title = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.mimeType = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.docDate = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AttachmentsCompanion.insert({
+    required String id,
+    required String vehicleId,
+    required String ownerKind,
+    required String ownerId,
+    this.docType = const Value.absent(),
+    this.title = const Value.absent(),
+    required String fileName,
+    required String mimeType,
+    this.sizeBytes = const Value.absent(),
+    this.docDate = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       vehicleId = Value(vehicleId),
+       ownerKind = Value(ownerKind),
+       ownerId = Value(ownerId),
+       fileName = Value(fileName),
+       mimeType = Value(mimeType);
+  static Insertable<Attachment> custom({
+    Expression<String>? id,
+    Expression<String>? vehicleId,
+    Expression<String>? ownerKind,
+    Expression<String>? ownerId,
+    Expression<String>? docType,
+    Expression<String>? title,
+    Expression<String>? fileName,
+    Expression<String>? mimeType,
+    Expression<int>? sizeBytes,
+    Expression<DateTime>? docDate,
+    Expression<DateTime>? addedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (vehicleId != null) 'vehicle_id': vehicleId,
+      if (ownerKind != null) 'owner_kind': ownerKind,
+      if (ownerId != null) 'owner_id': ownerId,
+      if (docType != null) 'doc_type': docType,
+      if (title != null) 'title': title,
+      if (fileName != null) 'file_name': fileName,
+      if (mimeType != null) 'mime_type': mimeType,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (docDate != null) 'doc_date': docDate,
+      if (addedAt != null) 'added_at': addedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AttachmentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? vehicleId,
+    Value<String>? ownerKind,
+    Value<String>? ownerId,
+    Value<String>? docType,
+    Value<String?>? title,
+    Value<String>? fileName,
+    Value<String>? mimeType,
+    Value<int>? sizeBytes,
+    Value<DateTime?>? docDate,
+    Value<DateTime>? addedAt,
+    Value<int>? rowid,
+  }) {
+    return AttachmentsCompanion(
+      id: id ?? this.id,
+      vehicleId: vehicleId ?? this.vehicleId,
+      ownerKind: ownerKind ?? this.ownerKind,
+      ownerId: ownerId ?? this.ownerId,
+      docType: docType ?? this.docType,
+      title: title ?? this.title,
+      fileName: fileName ?? this.fileName,
+      mimeType: mimeType ?? this.mimeType,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      docDate: docDate ?? this.docDate,
+      addedAt: addedAt ?? this.addedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (vehicleId.present) {
+      map['vehicle_id'] = Variable<String>(vehicleId.value);
+    }
+    if (ownerKind.present) {
+      map['owner_kind'] = Variable<String>(ownerKind.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
+    if (docType.present) {
+      map['doc_type'] = Variable<String>(docType.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (mimeType.present) {
+      map['mime_type'] = Variable<String>(mimeType.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (docDate.present) {
+      map['doc_date'] = Variable<DateTime>(docDate.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttachmentsCompanion(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('ownerKind: $ownerKind, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('docType: $docType, ')
+          ..write('title: $title, ')
+          ..write('fileName: $fileName, ')
+          ..write('mimeType: $mimeType, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('docDate: $docDate, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StationsTable extends Stations with TableInfo<$StationsTable, Station> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -9110,6 +9771,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $VehiclesTable vehicles = $VehiclesTable(this);
+  late final $AttachmentsTable attachments = $AttachmentsTable(this);
   late final $StationsTable stations = $StationsTable(this);
   late final $EnergyEventsTable energyEvents = $EnergyEventsTable(this);
   late final $ExpensesTable expenses = $ExpensesTable(this);
@@ -9129,6 +9791,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     vehicles,
+    attachments,
     stations,
     energyEvents,
     expenses,
@@ -9180,6 +9843,24 @@ typedef $$VehiclesTableUpdateCompanionBuilder =
 final class $$VehiclesTableReferences
     extends BaseReferences<_$AppDatabase, $VehiclesTable, Vehicle> {
   $$VehiclesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$AttachmentsTable, List<Attachment>>
+  _attachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.attachments,
+    aliasName: $_aliasNameGenerator(db.vehicles.id, db.attachments.vehicleId),
+  );
+
+  $$AttachmentsTableProcessedTableManager get attachmentsRefs {
+    final manager = $$AttachmentsTableTableManager(
+      $_db,
+      $_db.attachments,
+    ).filter((f) => f.vehicleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_attachmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 
   static MultiTypedResultKey<$EnergyEventsTable, List<EnergyEvent>>
   _energyEventsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -9385,6 +10066,31 @@ class $$VehiclesTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> attachmentsRefs(
+    Expression<bool> Function($$AttachmentsTableFilterComposer f) f,
+  ) {
+    final $$AttachmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.attachments,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AttachmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.attachments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<bool> energyEventsRefs(
     Expression<bool> Function($$EnergyEventsTableFilterComposer f) f,
@@ -9683,6 +10389,31 @@ class $$VehiclesTableAnnotationComposer
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
+  Expression<T> attachmentsRefs<T extends Object>(
+    Expression<T> Function($$AttachmentsTableAnnotationComposer a) f,
+  ) {
+    final $$AttachmentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.attachments,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AttachmentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.attachments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> energyEventsRefs<T extends Object>(
     Expression<T> Function($$EnergyEventsTableAnnotationComposer a) f,
   ) {
@@ -9874,6 +10605,7 @@ class $$VehiclesTableTableManager
           (Vehicle, $$VehiclesTableReferences),
           Vehicle,
           PrefetchHooks Function({
+            bool attachmentsRefs,
             bool energyEventsRefs,
             bool expensesRefs,
             bool tripsRefs,
@@ -9964,6 +10696,7 @@ class $$VehiclesTableTableManager
               .toList(),
           prefetchHooksCallback:
               ({
+                attachmentsRefs = false,
                 energyEventsRefs = false,
                 expensesRefs = false,
                 tripsRefs = false,
@@ -9975,6 +10708,7 @@ class $$VehiclesTableTableManager
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (attachmentsRefs) db.attachments,
                     if (energyEventsRefs) db.energyEvents,
                     if (expensesRefs) db.expenses,
                     if (tripsRefs) db.trips,
@@ -9986,6 +10720,27 @@ class $$VehiclesTableTableManager
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (attachmentsRefs)
+                        await $_getPrefetchedData<
+                          Vehicle,
+                          $VehiclesTable,
+                          Attachment
+                        >(
+                          currentTable: table,
+                          referencedTable: $$VehiclesTableReferences
+                              ._attachmentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$VehiclesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).attachmentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.vehicleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (energyEventsRefs)
                         await $_getPrefetchedData<
                           Vehicle,
@@ -10154,6 +10909,7 @@ typedef $$VehiclesTableProcessedTableManager =
       (Vehicle, $$VehiclesTableReferences),
       Vehicle,
       PrefetchHooks Function({
+        bool attachmentsRefs,
         bool energyEventsRefs,
         bool expensesRefs,
         bool tripsRefs,
@@ -10162,6 +10918,439 @@ typedef $$VehiclesTableProcessedTableManager =
         bool serviceItemsRefs,
         bool insurancePoliciesRefs,
       })
+    >;
+typedef $$AttachmentsTableCreateCompanionBuilder =
+    AttachmentsCompanion Function({
+      required String id,
+      required String vehicleId,
+      required String ownerKind,
+      required String ownerId,
+      Value<String> docType,
+      Value<String?> title,
+      required String fileName,
+      required String mimeType,
+      Value<int> sizeBytes,
+      Value<DateTime?> docDate,
+      Value<DateTime> addedAt,
+      Value<int> rowid,
+    });
+typedef $$AttachmentsTableUpdateCompanionBuilder =
+    AttachmentsCompanion Function({
+      Value<String> id,
+      Value<String> vehicleId,
+      Value<String> ownerKind,
+      Value<String> ownerId,
+      Value<String> docType,
+      Value<String?> title,
+      Value<String> fileName,
+      Value<String> mimeType,
+      Value<int> sizeBytes,
+      Value<DateTime?> docDate,
+      Value<DateTime> addedAt,
+      Value<int> rowid,
+    });
+
+final class $$AttachmentsTableReferences
+    extends BaseReferences<_$AppDatabase, $AttachmentsTable, Attachment> {
+  $$AttachmentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $VehiclesTable _vehicleIdTable(_$AppDatabase db) =>
+      db.vehicles.createAlias(
+        $_aliasNameGenerator(db.attachments.vehicleId, db.vehicles.id),
+      );
+
+  $$VehiclesTableProcessedTableManager get vehicleId {
+    final $_column = $_itemColumn<String>('vehicle_id')!;
+
+    final manager = $$VehiclesTableTableManager(
+      $_db,
+      $_db.vehicles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_vehicleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AttachmentsTableFilterComposer
+    extends Composer<_$AppDatabase, $AttachmentsTable> {
+  $$AttachmentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerKind => $composableBuilder(
+    column: $table.ownerKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get docType => $composableBuilder(
+    column: $table.docType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get docDate => $composableBuilder(
+    column: $table.docDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$VehiclesTableFilterComposer get vehicleId {
+    final $$VehiclesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableFilterComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AttachmentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AttachmentsTable> {
+  $$AttachmentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerKind => $composableBuilder(
+    column: $table.ownerKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get docType => $composableBuilder(
+    column: $table.docType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mimeType => $composableBuilder(
+    column: $table.mimeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get docDate => $composableBuilder(
+    column: $table.docDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$VehiclesTableOrderingComposer get vehicleId {
+    final $$VehiclesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableOrderingComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AttachmentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AttachmentsTable> {
+  $$AttachmentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerKind =>
+      $composableBuilder(column: $table.ownerKind, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<String> get docType =>
+      $composableBuilder(column: $table.docType, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<String> get mimeType =>
+      $composableBuilder(column: $table.mimeType, builder: (column) => column);
+
+  GeneratedColumn<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get docDate =>
+      $composableBuilder(column: $table.docDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  $$VehiclesTableAnnotationComposer get vehicleId {
+    final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AttachmentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AttachmentsTable,
+          Attachment,
+          $$AttachmentsTableFilterComposer,
+          $$AttachmentsTableOrderingComposer,
+          $$AttachmentsTableAnnotationComposer,
+          $$AttachmentsTableCreateCompanionBuilder,
+          $$AttachmentsTableUpdateCompanionBuilder,
+          (Attachment, $$AttachmentsTableReferences),
+          Attachment,
+          PrefetchHooks Function({bool vehicleId})
+        > {
+  $$AttachmentsTableTableManager(_$AppDatabase db, $AttachmentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AttachmentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AttachmentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AttachmentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> vehicleId = const Value.absent(),
+                Value<String> ownerKind = const Value.absent(),
+                Value<String> ownerId = const Value.absent(),
+                Value<String> docType = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String> fileName = const Value.absent(),
+                Value<String> mimeType = const Value.absent(),
+                Value<int> sizeBytes = const Value.absent(),
+                Value<DateTime?> docDate = const Value.absent(),
+                Value<DateTime> addedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AttachmentsCompanion(
+                id: id,
+                vehicleId: vehicleId,
+                ownerKind: ownerKind,
+                ownerId: ownerId,
+                docType: docType,
+                title: title,
+                fileName: fileName,
+                mimeType: mimeType,
+                sizeBytes: sizeBytes,
+                docDate: docDate,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String vehicleId,
+                required String ownerKind,
+                required String ownerId,
+                Value<String> docType = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                required String fileName,
+                required String mimeType,
+                Value<int> sizeBytes = const Value.absent(),
+                Value<DateTime?> docDate = const Value.absent(),
+                Value<DateTime> addedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AttachmentsCompanion.insert(
+                id: id,
+                vehicleId: vehicleId,
+                ownerKind: ownerKind,
+                ownerId: ownerId,
+                docType: docType,
+                title: title,
+                fileName: fileName,
+                mimeType: mimeType,
+                sizeBytes: sizeBytes,
+                docDate: docDate,
+                addedAt: addedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$AttachmentsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({vehicleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (vehicleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.vehicleId,
+                                referencedTable: $$AttachmentsTableReferences
+                                    ._vehicleIdTable(db),
+                                referencedColumn: $$AttachmentsTableReferences
+                                    ._vehicleIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AttachmentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AttachmentsTable,
+      Attachment,
+      $$AttachmentsTableFilterComposer,
+      $$AttachmentsTableOrderingComposer,
+      $$AttachmentsTableAnnotationComposer,
+      $$AttachmentsTableCreateCompanionBuilder,
+      $$AttachmentsTableUpdateCompanionBuilder,
+      (Attachment, $$AttachmentsTableReferences),
+      Attachment,
+      PrefetchHooks Function({bool vehicleId})
     >;
 typedef $$StationsTableCreateCompanionBuilder =
     StationsCompanion Function({
@@ -15590,6 +16779,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$VehiclesTableTableManager get vehicles =>
       $$VehiclesTableTableManager(_db, _db.vehicles);
+  $$AttachmentsTableTableManager get attachments =>
+      $$AttachmentsTableTableManager(_db, _db.attachments);
   $$StationsTableTableManager get stations =>
       $$StationsTableTableManager(_db, _db.stations);
   $$EnergyEventsTableTableManager get energyEvents =>

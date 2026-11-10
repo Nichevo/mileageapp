@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 
@@ -12,7 +13,9 @@ import '../data/database.dart';
 
 const backupFormatVersion = 1;
 
-Future<String> exportBackupJson(AppDatabase db) async {
+/// [attachmentsDir], when given, adds the photo and PDF files themselves
+/// (base64), so a restore on a new phone brings them back.
+Future<String> exportBackupJson(AppDatabase db, {Directory? attachmentsDir}) async {
   Future<List<Map<String, dynamic>>> dump(TableInfo table) async {
     final rows = await db.select(table).get();
     return rows.map((r) => (r as DataClass).toJson()).toList();
@@ -35,7 +38,16 @@ Future<String> exportBackupJson(AppDatabase db) async {
     'service_items': await dump(db.serviceItems),
     'insurance_policies': await dump(db.insurancePolicies),
     'fuel_credits': await dump(db.fuelCredits),
+    'attachments': await dump(db.attachments),
   };
+  if (attachmentsDir != null) {
+    final files = <String, String>{};
+    for (final a in await db.select(db.attachments).get()) {
+      final f = File('${attachmentsDir.path}/${a.fileName}');
+      if (await f.exists()) files[a.fileName] = base64Encode(await f.readAsBytes());
+    }
+    data['attachment_files'] = files;
+  }
   return const JsonEncoder.withIndent('  ').convert(data);
 }
 
@@ -45,7 +57,7 @@ class RestoreSummary {
   String toString() => rows.entries.map((e) => '${e.value} ${e.key}').join(', ');
 }
 
-Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json) async {
+Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json, {Directory? attachmentsDir}) async {
   final data = jsonDecode(json) as Map<String, dynamic>;
   if (data['app'] != 'MileageLog') {
     throw const FormatException('Not a MileageLog backup file');
@@ -79,6 +91,7 @@ Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json) async {
     await load('service_items', db.serviceItems, ServiceItem.fromJson);
     await load('insurance_policies', db.insurancePolicies, InsurancePolicy.fromJson);
     await load('fuel_credits', db.fuelCredits, FuelCredit.fromJson);
+    await load('attachments', db.attachments, Attachment.fromJson);
     // Trip points use an autoincrement key, so they can't be merged by id.
     // Restore a trip's points only when the phone has none for that trip.
     final points = (data['trip_points'] as List?) ?? const [];
@@ -97,5 +110,19 @@ Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json) async {
     }
     summary.rows['trip_points'] = n;
   });
+  final files = data['attachment_files'];
+  if (attachmentsDir != null && files is Map) {
+    await attachmentsDir.create(recursive: true);
+    var n = 0;
+    for (final e in files.entries) {
+      final name = e.key as String;
+      if (name.contains('/') || name.contains('\\') || name.startsWith('.')) continue; // file names only
+      final f = File('${attachmentsDir.path}/$name');
+      if (await f.exists()) continue;
+      await f.writeAsBytes(base64Decode(e.value as String));
+      n++;
+    }
+    summary.rows['document files'] = n;
+  }
   return summary;
 }

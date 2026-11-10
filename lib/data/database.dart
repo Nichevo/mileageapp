@@ -273,7 +273,32 @@ class FuelCredits extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// v5: a photo or PDF kept with a record: a service or WOF invoice, an
+/// insurance document, registration papers. The file itself lives in the
+/// app's private storage under `attachments/<fileName>`.
+@DataClassName('Attachment')
+class Attachments extends Table {
+  TextColumn get id => text()();
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  /// What it hangs off: 'expense', 'policy', or 'vehicle' (stand-alone).
+  TextColumn get ownerKind => text()();
+  TextColumn get ownerId => text()();
+  /// 'wof', 'service', 'insurance', 'rego', 'tyres', 'other'
+  TextColumn get docType => text().withDefault(const Constant('other'))();
+  TextColumn get title => text().nullable()();
+  /// File name inside the attachments folder.
+  TextColumn get fileName => text()();
+  TextColumn get mimeType => text()();
+  IntColumn get sizeBytes => integer().withDefault(const Constant(0))();
+  /// The document's own date (invoice date), when known.
+  DateTimeColumn get docDate => dateTime().nullable()();
+  DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
+  Attachments,
   Vehicles,
   Stations,
   EnergyEvents,
@@ -293,7 +318,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -317,6 +342,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(energyEvents, energyEvents.listCost);
             await m.addColumn(expenses, expenses.tripId);
             await m.createTable(fuelCredits);
+          }
+          if (from < 5) {
+            await m.createTable(attachments);
           }
         },
         beforeOpen: (details) async {

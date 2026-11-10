@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -9,8 +10,10 @@ import 'package:share_plus/share_plus.dart';
 
 import '../app.dart';
 import '../backup/backup.dart';
+import '../data/attachment_store.dart';
 import '../sync/sheets_sync.dart';
 import 'format.dart';
+import 'attachments.dart' show DocumentsPage;
 import 'care_page.dart';
 import 'import_page.dart';
 import 'reminder_settings_page.dart';
@@ -41,7 +44,7 @@ class _MorePageState extends State<MorePage> {
   Future<void> _backup() async {
     final scope = AppScope.of(context);
     try {
-      final json = await exportBackupJson(scope.repo.db);
+      final json = await exportBackupJson(scope.repo.db, attachmentsDir: (await AttachmentStore.get()).dir);
       final dir = await getApplicationDocumentsDirectory();
       final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
       final file = File(p.join(dir.path, 'mileagelog-backup-$stamp.json'));
@@ -73,7 +76,8 @@ class _MorePageState extends State<MorePage> {
     );
     if (ok != true || !mounted) return;
     try {
-      final summary = await restoreBackupJson(AppScope.of(context).repo.db, String.fromCharCodes(bytes));
+      final db = AppScope.of(context).repo.db;
+      final summary = await restoreBackupJson(db, utf8.decode(bytes), attachmentsDir: (await AttachmentStore.get()).dir);
       _snack('Restored: $summary');
     } catch (e) {
       _snack('Restore failed: $e');
@@ -164,6 +168,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Car care'),
             subtitle: const Text('Service schedule, insurance, tyres'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CarCarePage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: const Text('Documents'),
+            subtitle: const Text('WOF, service invoices, insurance, rego papers'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DocumentsPage())),
           ),
           ListTile(
             leading: const Icon(Icons.price_check),

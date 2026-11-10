@@ -200,6 +200,25 @@ class Repository {
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
 
+  // ---- attachments -------------------------------------------------------
+
+  Stream<List<Attachment>> watchAttachmentsOf(String ownerKind, String ownerId) => (db.select(db.attachments)
+        ..where((a) => a.ownerKind.equals(ownerKind) & a.ownerId.equals(ownerId))
+        ..orderBy([(a) => OrderingTerm.asc(a.addedAt)]))
+      .watch();
+
+  Future<List<Attachment>> attachmentsOf(String ownerKind, String ownerId) =>
+      (db.select(db.attachments)..where((a) => a.ownerKind.equals(ownerKind) & a.ownerId.equals(ownerId))).get();
+
+  Stream<List<Attachment>> watchVehicleAttachments(String vehicleId) => (db.select(db.attachments)
+        ..where((a) => a.vehicleId.equals(vehicleId))
+        ..orderBy([(a) => OrderingTerm.desc(a.addedAt)]))
+      .watch();
+
+  Future<void> updateAttachment(String id, {required String docType, String? title, DateTime? docDate}) =>
+      (db.update(db.attachments)..where((a) => a.id.equals(id)))
+          .write(AttachmentsCompanion(docType: Value(docType), title: Value(title), docDate: Value(docDate)));
+
   // ---- car care ----------------------------------------------------------
 
   Stream<List<ServiceItem>> watchServiceItems(String vehicleId) =>
@@ -227,10 +246,11 @@ class Repository {
     String? location,
     String? notes,
     List<String> itemIds = const [],
+    String? id,
   }) =>
       db.transaction(() async {
         await db.into(db.expenses).insert(ExpensesCompanion.insert(
-              id: newId(),
+              id: id ?? newId(),
               vehicleId: vehicleId,
               at: at,
               odometerKm: Value(odometerKm),

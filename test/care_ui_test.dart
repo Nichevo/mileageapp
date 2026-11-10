@@ -86,13 +86,16 @@ void main() {
 
   testWidgets('insurance and tyre pages render and save', (tester) async {
     final (db, repo, settings, vid) = await seed();
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(host(repo, settings, const InsurancePage()));
     await settle(tester);
     await tester.tap(find.text('Add policy'));
     await settle(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Insurer'), 'Test Insurer');
     await tester.enterText(find.widgetWithText(TextField, 'Insured value \$'), '15000');
-    await tester.drag(find.byType(ListView).last, const Offset(0, -600));
+    await tester.ensureVisible(find.text('Save'));
     await settle(tester);
     await tester.tap(find.text('Save'));
     await settle(tester);

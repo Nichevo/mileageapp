@@ -2,9 +2,11 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../data/attachment_store.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
 import '../domain/care.dart';
+import 'attachments.dart';
 import 'format.dart';
 
 /// Kind of record, as stored on expenses and service items.
@@ -23,13 +25,13 @@ const expenseKinds = <String, String>{
 bool isServiceKind(String kind) => !const {'insurance', 'toll', 'parking'}.contains(kind);
 
 IconData kindIcon(String kind) => switch (kind) {
-      'wof' => Icons.verified_outlined,
-      'rego' => Icons.badge_outlined,
-      'tyres' => Icons.tire_repair,
-      'insurance' => Icons.shield_outlined,
-      'service' => Icons.build_outlined,
-      _ => Icons.receipt_long_outlined,
-    };
+  'wof' => Icons.verified_outlined,
+  'rego' => Icons.badge_outlined,
+  'tyres' => Icons.tire_repair,
+  'insurance' => Icons.shield_outlined,
+  'service' => Icons.build_outlined,
+  _ => Icons.receipt_long_outlined,
+};
 
 /// Odometer now (estimated) and typical km per day, from fill-ups.
 ({double? km, double? perDay}) drivingNow(List<EnergyEvent> events) {
@@ -38,19 +40,19 @@ IconData kindIcon(String kind) => switch (kind) {
 }
 
 DueInfo dueOf(ServiceItem i, ({double? km, double? perDay}) d) => dueFor(
-      lastDoneAt: i.lastDoneAt,
-      lastDoneKm: i.lastDoneKm,
-      intervalMonths: i.intervalMonths,
-      intervalKm: i.intervalKm,
-      currentKm: d.km,
-      kmPerDay: d.perDay,
-      now: DateTime.now(),
-    );
+  lastDoneAt: i.lastDoneAt,
+  lastDoneKm: i.lastDoneKm,
+  intervalMonths: i.intervalMonths,
+  intervalKm: i.intervalKm,
+  currentKm: d.km,
+  kmPerDay: d.perDay,
+  now: DateTime.now(),
+);
 
 String intervalText(int? months, int? km) => [
-      if (months != null) months % 12 == 0 ? 'every ${months ~/ 12 == 1 ? 'year' : '${months ~/ 12} years'}' : 'every $months months',
-      if (km != null) '${fmtKm(km)} km',
-    ].join(' or ');
+  if (months != null) months % 12 == 0 ? 'every ${months ~/ 12 == 1 ? 'year' : '${months ~/ 12} years'}' : 'every $months months',
+  if (km != null) '${fmtKm(km)} km',
+].join(' or ');
 
 String dueText(DueInfo d) {
   if (d.state == DueState.unknown) return 'Set when it was last done';
@@ -62,10 +64,10 @@ String dueText(DueInfo d) {
   final when = days == null
       ? ''
       : days < 0
-          ? ' · ${-days} days overdue'
-          : days == 0
-              ? ' · today'
-              : ' · in $days days';
+      ? ' · ${-days} days overdue'
+      : days == 0
+      ? ' · today'
+      : ' · in $days days';
   final km = d.kmLeft == null ? '' : (d.kmLeft! < 0 ? ' · ${fmtKm(-d.kmLeft!)} km over' : ' · ${fmtKm(d.kmLeft!)} km to go');
   return 'Due ${parts.join(' or ')}$when${d.dueAt == null ? km : ''}';
 }
@@ -160,22 +162,24 @@ class ServicePage extends StatelessWidget {
   }
 
   Widget _emptyState(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('No schedule yet. Start from the usual NZ list (WOF, rego, oil changes and so on), then adjust the intervals to match your owner\'s manual.'),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RecommendedServicesPage())),
-                icon: const Icon(Icons.playlist_add),
-                label: const Text('Add recommended schedule'),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'No schedule yet. Start from the usual NZ list (WOF, rego, oil changes and so on), then adjust the intervals to match your owner\'s manual.',
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RecommendedServicesPage())),
+            icon: const Icon(Icons.playlist_add),
+            label: const Text('Add recommended schedule'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Past service, WOF, rego and other records (including the old app's).
@@ -187,45 +191,128 @@ class _History extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     final t = Theme.of(context).textTheme;
-    return StreamBuilder<List<Expense>>(
-      stream: scope.repo.watchExpenses(vehicleId),
-      builder: (context, snap) {
-        final list = (snap.data ?? const <Expense>[]).where((e) => e.kind != 'insurance').toList();
-        if (list.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Records', style: t.titleSmall),
-            for (final e in list.take(40))
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: Icon(kindIcon(e.kind)),
-                title: Text(e.description),
-                subtitle: Text([
-                  fmtDate(e.at),
-                  if (e.odometerKm != null) '${fmtKm(e.odometerKm!)} km',
-                  if (e.location != null) e.location!,
-                ].join(' · ')),
-                trailing: Text(fmtMoney(e.cost)),
-                onLongPress: () async {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('Delete this record?'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+    return StreamBuilder<List<Attachment>>(
+      stream: scope.repo.watchVehicleAttachments(vehicleId),
+      builder: (context, attSnap) {
+        final withDocs = {
+          for (final a in attSnap.data ?? const <Attachment>[])
+            if (a.ownerKind == 'expense') a.ownerId,
+        };
+        return StreamBuilder<List<Expense>>(
+          stream: scope.repo.watchExpenses(vehicleId),
+          builder: (context, snap) {
+            final list = (snap.data ?? const <Expense>[]).where((e) => e.kind != 'insurance').toList();
+            if (list.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Records', style: t.titleSmall),
+                for (final e in list.take(40))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(kindIcon(e.kind)),
+                    title: Text(e.description),
+                    subtitle: Text([fmtDate(e.at), if (e.odometerKm != null) '${fmtKm(e.odometerKm!)} km', if (e.location != null) e.location!].join(' · ')),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (withDocs.contains(e.id)) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.attach_file, size: 18)),
+                        Text(fmtMoney(e.cost)),
                       ],
                     ),
-                  );
-                  if (ok == true) await scope.repo.deleteExpense(e.id);
-                },
-              ),
-            if (list.length > 40) Text('and ${list.length - 40} older', style: t.bodySmall),
-          ],
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceRecordPage(expense: e))),
+                    onLongPress: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('Delete this record?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+                          ],
+                        ),
+                      );
+                      if (ok == true) await deleteServiceRecord(scope, e.id);
+                    },
+                  ),
+                if (list.length > 40) Text('and ${list.length - 40} older', style: t.bodySmall),
+              ],
+            );
+          },
         );
       },
+    );
+  }
+}
+
+Future<void> deleteServiceRecord(AppScope scope, String id) async {
+  await (await AttachmentStore.get()).removeOwner(scope.repo, 'expense', id);
+  await scope.repo.deleteExpense(id);
+}
+
+/// One service, WOF or other record, with its photos and documents.
+class ServiceRecordPage extends StatelessWidget {
+  final Expense expense;
+  const ServiceRecordPage({super.key, required this.expense});
+
+  @override
+  Widget build(BuildContext context) {
+    final e = expense;
+    final scope = AppScope.of(context);
+    final t = Theme.of(context).textTheme;
+    Widget row(String label, String value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label, style: t.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          ),
+          Expanded(child: Text(value, style: t.bodyMedium)),
+        ],
+      ),
+    );
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(e.description),
+        actions: [
+          IconButton(
+            tooltip: 'Delete',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: const Text('Delete this record?'),
+                  content: const Text('Its photos and documents are deleted too.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              await deleteServiceRecord(scope, e.id);
+              if (context.mounted) Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          row('Type', expenseKinds[e.kind] ?? e.kind),
+          row('Date', fmtDate(e.at)),
+          if (e.odometerKm != null) row('Odometer', '${fmtKm(e.odometerKm!)} km'),
+          row('Cost', fmtMoney(e.cost)),
+          if (e.location != null) row('Where', e.location!),
+          if (e.notes != null) row('Notes', e.notes!),
+          const SizedBox(height: 20),
+          AttachmentStrip(vehicleId: e.vehicleId, ownerKind: 'expense', ownerId: e.id, docType: docTypeForExpense(e.kind)),
+        ],
+      ),
     );
   }
 }
@@ -239,7 +326,10 @@ class RecommendedServicesPage extends StatefulWidget {
 }
 
 class _RecommendedServicesPageState extends State<RecommendedServicesPage> {
-  final _picked = <int>{for (var i = 0; i < recommendedServices.length; i++) if (recommendedServices[i].name != 'Timing belt') i};
+  final _picked = <int>{
+    for (var i = 0; i < recommendedServices.length; i++)
+      if (recommendedServices[i].name != 'Timing belt') i,
+  };
   List<Expense> _history = const [];
   bool _loaded = false;
 
@@ -273,17 +363,19 @@ class _RecommendedServicesPageState extends State<RecommendedServicesPage> {
     for (final i in _picked) {
       final t = recommendedServices[i];
       final last = _lastMatch(t);
-      await scope.repo.upsertServiceItem(ServiceItemsCompanion.insert(
-        id: newId(),
-        vehicleId: vid,
-        name: t.name,
-        kind: Value(t.kind),
-        intervalMonths: Value(t.months),
-        intervalKm: Value(t.km),
-        lastDoneAt: Value(last?.at),
-        lastDoneKm: Value(last?.odometerKm),
-        notes: Value(t.note),
-      ));
+      await scope.repo.upsertServiceItem(
+        ServiceItemsCompanion.insert(
+          id: newId(),
+          vehicleId: vid,
+          name: t.name,
+          kind: Value(t.kind),
+          intervalMonths: Value(t.months),
+          intervalKm: Value(t.km),
+          lastDoneAt: Value(last?.at),
+          lastDoneKm: Value(last?.odometerKm),
+          notes: Value(t.note),
+        ),
+      );
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -302,23 +394,23 @@ class _RecommendedServicesPageState extends State<RecommendedServicesPage> {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Text('Typical intervals for a petrol car. You can change any of them afterwards. "Last done" comes from your imported records where one matches.'),
+            child: Text(
+              'Typical intervals for a petrol car. You can change any of them afterwards. "Last done" comes from your imported records where one matches.',
+            ),
           ),
           for (var i = 0; i < recommendedServices.length; i++)
-            Builder(builder: (context) {
-              final t = recommendedServices[i];
-              final last = _lastMatch(t);
-              return CheckboxListTile(
-                value: _picked.contains(i),
-                onChanged: (v) => setState(() => v == true ? _picked.add(i) : _picked.remove(i)),
-                title: Text(t.name),
-                subtitle: Text([
-                  intervalText(t.months, t.km),
-                  if (last != null) 'last done ${fmtDate(last.at)}',
-                  if (t.note != null) t.note!,
-                ].join('\n')),
-              );
-            }),
+            Builder(
+              builder: (context) {
+                final t = recommendedServices[i];
+                final last = _lastMatch(t);
+                return CheckboxListTile(
+                  value: _picked.contains(i),
+                  onChanged: (v) => setState(() => v == true ? _picked.add(i) : _picked.remove(i)),
+                  title: Text(t.name),
+                  subtitle: Text([intervalText(t.months, t.km), if (last != null) 'last done ${fmtDate(last.at)}', if (t.note != null) t.note!].join('\n')),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -344,17 +436,19 @@ class _ServiceItemFormState extends State<ServiceItemForm> {
   Future<void> _save() async {
     final scope = AppScope.of(context);
     if (_name.text.trim().isEmpty) return;
-    await scope.repo.upsertServiceItem(ServiceItemsCompanion.insert(
-      id: widget.item?.id ?? newId(),
-      vehicleId: scope.settings.activeVehicleId!,
-      name: _name.text.trim(),
-      kind: Value(_kind),
-      intervalMonths: Value(int.tryParse(_months.text)),
-      intervalKm: Value(int.tryParse(_km.text.replaceAll(',', ''))),
-      lastDoneAt: Value(_lastAt),
-      lastDoneKm: Value(double.tryParse(_lastKm.text.replaceAll(',', ''))),
-      notes: Value(_notes.text.trim().isEmpty ? null : _notes.text.trim()),
-    ));
+    await scope.repo.upsertServiceItem(
+      ServiceItemsCompanion.insert(
+        id: widget.item?.id ?? newId(),
+        vehicleId: scope.settings.activeVehicleId!,
+        name: _name.text.trim(),
+        kind: Value(_kind),
+        intervalMonths: Value(int.tryParse(_months.text)),
+        intervalKm: Value(int.tryParse(_km.text.replaceAll(',', ''))),
+        lastDoneAt: Value(_lastAt),
+        lastDoneKm: Value(double.tryParse(_lastKm.text.replaceAll(',', ''))),
+        notes: Value(_notes.text.trim().isEmpty ? null : _notes.text.trim()),
+      ),
+    );
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -374,20 +468,40 @@ class _ServiceItemFormState extends State<ServiceItemForm> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name', border: border)),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Name', border: border),
+          ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _kind,
             decoration: const InputDecoration(labelText: 'Type', border: border),
-            items: [for (final e in expenseKinds.entries) if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value))],
+            items: [
+              for (final e in expenseKinds.entries)
+                if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value)),
+            ],
             onChanged: (v) => setState(() => _kind = v ?? 'service'),
           ),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: TextField(controller: _months, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Every … months', border: border))),
-            const SizedBox(width: 12),
-            Expanded(child: TextField(controller: _km, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'or every … km', border: border))),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _months,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Every … months', border: border),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _km,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'or every … km', border: border),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
           Text('Leave either blank if it only goes by time or only by distance.', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 12),
@@ -401,9 +515,17 @@ class _ServiceItemFormState extends State<ServiceItemForm> {
               if (d != null) setState(() => _lastAt = d);
             },
           ),
-          TextField(controller: _lastKm, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Odometer when last done (km)', border: border)),
+          TextField(
+            controller: _lastKm,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Odometer when last done (km)', border: border),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes', border: border)),
+          TextField(
+            controller: _notes,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Notes', border: border),
+          ),
           const SizedBox(height: 20),
           FilledButton(onPressed: _save, child: const Text('Save')),
         ],
@@ -429,6 +551,23 @@ class _LogServiceFormState extends State<LogServiceForm> {
   final _notes = TextEditingController();
   String _kind = 'service';
   final _done = <String>{};
+  final _id = newId();
+  var _saved = false;
+  AppScope? _scope;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scope = AppScope.of(context);
+  }
+
+  @override
+  void dispose() {
+    final scope = _scope;
+    // Photos added to a record that was never saved.
+    if (!_saved && scope != null) AttachmentStore.get().then((s) => s.removeOwner(scope.repo, 'expense', _id), onError: (_) {});
+    super.dispose();
+  }
 
   Future<void> _save(List<ServiceItem> items) async {
     final scope = AppScope.of(context);
@@ -444,7 +583,9 @@ class _LogServiceFormState extends State<LogServiceForm> {
       location: _where.text.trim().isEmpty ? null : _where.text.trim(),
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
       itemIds: picked.map((i) => i.id).toList(),
+      id: _id,
     );
+    _saved = true;
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -474,15 +615,32 @@ class _LogServiceFormState extends State<LogServiceForm> {
               DropdownButtonFormField<String>(
                 initialValue: _kind,
                 decoration: const InputDecoration(labelText: 'Type', border: border),
-                items: [for (final e in expenseKinds.entries) if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                items: [
+                  for (final e in expenseKinds.entries)
+                    if (isServiceKind(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value)),
+                ],
                 onChanged: (v) => setState(() => _kind = v ?? 'service'),
               ),
               const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: TextField(controller: _odo, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Odometer (km)', border: border))),
-                const SizedBox(width: 12),
-                Expanded(child: TextField(controller: _cost, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Cost \$', border: border))),
-              ]),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _odo,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Odometer (km)', border: border),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _cost,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Cost \$', border: border),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               if (items.isNotEmpty) ...[
                 Text('What was done', style: Theme.of(context).textTheme.titleSmall),
@@ -499,11 +657,23 @@ class _LogServiceFormState extends State<LogServiceForm> {
                   ),
                 const SizedBox(height: 8),
               ],
-              TextField(controller: _desc, decoration: const InputDecoration(labelText: 'Description (optional)', border: border)),
+              TextField(
+                controller: _desc,
+                decoration: const InputDecoration(labelText: 'Description (optional)', border: border),
+              ),
               const SizedBox(height: 12),
-              TextField(controller: _where, decoration: const InputDecoration(labelText: 'Where (optional)', border: border)),
+              TextField(
+                controller: _where,
+                decoration: const InputDecoration(labelText: 'Where (optional)', border: border),
+              ),
               const SizedBox(height: 12),
-              TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes (optional)', border: border)),
+              TextField(
+                controller: _notes,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'Notes (optional)', border: border),
+              ),
+              const SizedBox(height: 16),
+              AttachmentStrip(vehicleId: scope.settings.activeVehicleId!, ownerKind: 'expense', ownerId: _id, docType: docTypeForExpense(_kind)),
               const SizedBox(height: 20),
               FilledButton(onPressed: () => _save(items), child: const Text('Save')),
             ],

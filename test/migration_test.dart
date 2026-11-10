@@ -26,7 +26,8 @@ void main() {
     await db.close();
 
     db = AppDatabase(NativeDatabase(file, setup: (raw) {
-      if (raw.userVersion == 4) {
+      if (raw.userVersion == 5) {
+        raw.execute('DROP TABLE attachments');
         raw.execute('DROP TABLE fuel_credits');
         raw.execute('ALTER TABLE energy_events DROP COLUMN sharetank_litres');
         raw.execute('ALTER TABLE energy_events DROP COLUMN list_cost');
@@ -55,6 +56,9 @@ void main() {
     await db.into(db.fuelCredits).insert(FuelCreditsCompanion.insert(id: 'f1', at: DateTime(2026, 1, 1), litres: 50, cost: 120));
     expect((await db.select(db.fuelCredits).get()).single.litres, 50);
     expect((await db.select(db.expenses).get()), isEmpty);
+    // v5 attachments table exists and works.
+    await db.into(db.attachments).insert(AttachmentsCompanion.insert(id: 'a1', vehicleId: 'v1', ownerKind: 'vehicle', ownerId: 'v1', fileName: 'a1.jpg', mimeType: 'image/jpeg'));
+    expect((await db.select(db.attachments).get()).single.fileName, 'a1.jpg');
     await db.close();
     await dir.delete(recursive: true);
   });

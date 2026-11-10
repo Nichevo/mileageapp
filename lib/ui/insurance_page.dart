@@ -3,8 +3,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../data/attachment_store.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import 'attachments.dart';
 import 'format.dart';
 
 const coverLabels = <String, String>{
@@ -174,6 +176,23 @@ class PolicyForm extends StatefulWidget {
 
 class _PolicyFormState extends State<PolicyForm> {
   late final InsurancePolicy? _base = widget.policy ?? widget.renewFrom;
+  late final String _id = widget.policy?.id ?? newId();
+  var _saved = false;
+  AppScope? _scope;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scope = AppScope.of(context);
+  }
+
+  @override
+  void dispose() {
+    final scope = _scope;
+    // Documents added to a new policy that was never saved.
+    if (!_saved && widget.policy == null && scope != null) AttachmentStore.get().then((s) => s.removeOwner(scope.repo, 'policy', _id), onError: (_) {});
+    super.dispose();
+  }
   late final _insurer = TextEditingController(text: _base?.insurer ?? '');
   late final _number = TextEditingController(text: _base?.policyNumber ?? '');
   late final _value = TextEditingController(text: _base?.insuredValue?.round().toString() ?? '');
@@ -195,7 +214,7 @@ class _PolicyFormState extends State<PolicyForm> {
     }
     final scope = AppScope.of(context);
     await scope.repo.upsertPolicy(InsurancePoliciesCompanion.insert(
-      id: widget.policy?.id ?? newId(),
+      id: _id,
       vehicleId: scope.settings.activeVehicleId!,
       insurer: _insurer.text.trim(),
       cover: Value(_cover),
@@ -209,11 +228,14 @@ class _PolicyFormState extends State<PolicyForm> {
       renewAt: Value(_renew),
       notes: Value(_notes.text.trim().isEmpty ? null : _notes.text.trim()),
     ));
+    _saved = true;
     if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _delete() async {
-    await AppScope.of(context).repo.deletePolicy(widget.policy!.id);
+    final repo = AppScope.of(context).repo;
+    await (await AttachmentStore.get()).removeOwner(repo, 'policy', widget.policy!.id);
+    await repo.deletePolicy(widget.policy!.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -286,6 +308,8 @@ class _PolicyFormState extends State<PolicyForm> {
             },
           ),
           TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes', border: border)),
+          const SizedBox(height: 20),
+          AttachmentStrip(vehicleId: AppScope.of(context).settings.activeVehicleId!, ownerKind: 'policy', ownerId: _id, docType: 'insurance'),
           const SizedBox(height: 20),
           FilledButton(onPressed: _save, child: const Text('Save')),
         ],
