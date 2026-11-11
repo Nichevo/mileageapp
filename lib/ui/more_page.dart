@@ -18,6 +18,7 @@ import 'care_page.dart';
 import 'import_page.dart';
 import 'reminder_settings_page.dart';
 import 'ev_compare_page.dart';
+import 'export_page.dart';
 import 'prices_page.dart';
 import 'sharetank_page.dart';
 import 'vehicle_page.dart';
@@ -253,6 +254,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Back up now'),
             subtitle: Text(s.lastBackupAt == null ? 'Share a JSON file with everything in the app' : 'Last backup ${fmtDate(s.lastBackupAt!)}'),
             onTap: _backup,
+          ),
+          ListTile(
+            leading: const Icon(Icons.file_download_outlined),
+            title: const Text('Export data'),
+            subtitle: const Text('Spreadsheets of fill-ups, expenses, trips, costs, notes; GPX routes'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ExportPage())),
           ),
           ListTile(
             leading: const Icon(Icons.restore),

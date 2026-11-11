@@ -19,6 +19,7 @@ import '../trips/recorder.dart' show TripRecorder;
 import '../trips/road_lookup.dart';
 import '../trips/route_compare_service.dart';
 import '../trips/weather_lookup.dart';
+import 'export_page.dart' show shareTripGpx;
 import 'format.dart';
 import 'places_page.dart' show pickPlaceName;
 import 'toll_form.dart';
@@ -183,6 +184,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
             title: Text(trip == null ? 'Trip' : _title(trip)),
             actions: [
               if (trip != null) IconButton(tooltip: 'Edit', icon: const Icon(Icons.edit_outlined), onPressed: () => _rename(trip)),
+              if (trip != null) IconButton(tooltip: 'Export GPX route', icon: const Icon(Icons.ios_share), onPressed: () => shareTripGpx(context, trip)),
               IconButton(tooltip: 'Delete', icon: const Icon(Icons.delete_outline), onPressed: _delete),
             ],
           ),

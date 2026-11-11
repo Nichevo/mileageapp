@@ -4,7 +4,7 @@ publish_to: 'none'
 
 # versionName+versionCode. CI overrides the build number with the run number
 # so every build installs over the previous one as an update.
-version: 0.22.0+1
+version: 0.23.0+1
 
 environment:
   sdk: ^3.9.2
@@ -20,6 +20,7 @@ dependencies:
   intl: ^0.20.2
   fl_chart: ^1.0.0
   csv: ^6.0.0
+  archive: ^4.0.0
   file_picker: ^10.3.2
   image_picker: ^1.1.2
   share_plus: ^11.0.0
