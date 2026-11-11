@@ -40,6 +40,7 @@ Future<String> exportBackupJson(AppDatabase db, {Directory? attachmentsDir}) asy
     'fuel_credits': await dump(db.fuelCredits),
     'attachments': await dump(db.attachments),
     'vehicle_values': await dump(db.vehicleValues),
+    'car_notes': await dump(db.carNotes),
   };
   if (attachmentsDir != null) {
     final files = <String, String>{};
@@ -94,6 +95,7 @@ Future<RestoreSummary> restoreBackupJson(AppDatabase db, String json, {Directory
     await load('fuel_credits', db.fuelCredits, FuelCredit.fromJson);
     await load('attachments', db.attachments, Attachment.fromJson);
     await load('vehicle_values', db.vehicleValues, VehicleValue.fromJson);
+    await load('car_notes', db.carNotes, CarNote.fromJson);
     // Trip points use an autoincrement key, so they can't be merged by id.
     // Restore a trip's points only when the phone has none for that trip.
     final points = (data['trip_points'] as List?) ?? const [];

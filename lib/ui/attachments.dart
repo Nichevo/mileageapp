@@ -7,6 +7,7 @@ import '../app.dart';
 import '../data/attachment_store.dart';
 import '../data/database.dart';
 import 'expense_page.dart' show ExpenseDetailPage;
+import '../platform/location.dart';
 import 'format.dart';
 
 /// Where a picked file came from; tests replace this.
@@ -81,7 +82,11 @@ class AttachmentThumb extends StatelessWidget {
 /// Photos and PDFs attached to one record, with a button to add more.
 class AttachmentStrip extends StatefulWidget {
   final String vehicleId, ownerKind, ownerId, docType;
-  const AttachmentStrip({super.key, required this.vehicleId, required this.ownerKind, required this.ownerId, this.docType = 'other'});
+  /// Notes and incidents: record where each photo was taken.
+  final bool withLocation;
+  final String? heading;
+  const AttachmentStrip(
+      {super.key, required this.vehicleId, required this.ownerKind, required this.ownerId, this.docType = 'other', this.withLocation = false, this.heading = 'Photos and documents'});
   @override
   State<AttachmentStrip> createState() => _AttachmentStripState();
 }
@@ -101,8 +106,12 @@ class _AttachmentStripState extends State<AttachmentStrip> {
     final scope = AppScope.of(context);
     final path = await pickDocumentFile(context);
     if (path == null || _store == null) return;
-    await _store!.add(scope.repo,
+    final a = await _store!.add(scope.repo,
         sourcePath: path, vehicleId: widget.vehicleId, ownerKind: widget.ownerKind, ownerId: widget.ownerId, docType: widget.docType);
+    if (widget.withLocation) {
+      final fix = await currentFix();
+      if (fix != null) await scope.repo.setAttachmentPlace(a.id, fix.lat, fix.lon);
+    }
   }
 
   @override
@@ -116,8 +125,7 @@ class _AttachmentStripState extends State<AttachmentStrip> {
       builder: (context, snap) {
         final list = snap.data ?? const <Attachment>[];
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Photos and documents', style: t.titleSmall),
-          const SizedBox(height: 8),
+          if (widget.heading != null) ...[Text(widget.heading!, style: t.titleSmall), const SizedBox(height: 8)],
           Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
             for (final a in list)
               InkWell(
@@ -174,6 +182,18 @@ class AttachmentViewer extends StatelessWidget {
             },
           ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Text(
+            [
+              'Added ${fmtDate(a.addedAt)} ${TimeOfDay.fromDateTime(a.addedAt).format(context)}',
+              if (a.lat != null) 'at ${a.lat!.toStringAsFixed(5)}, ${a.lon!.toStringAsFixed(5)}',
+            ].join(' '),
+            style: t.bodySmall,
+          ),
+        ),
       ),
       body: isImage(a)
           ? InteractiveViewer(maxScale: 6, child: Center(child: Image.file(store.file(a))))
@@ -267,7 +287,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     await _store!.add(scope.repo, sourcePath: path, vehicleId: vid, ownerKind: 'vehicle', ownerId: vid, docType: d.docType, title: d.title, docDate: d.date);
   }
 
-  static const _from = {'expense': 'On an expense', 'policy': 'From an insurance policy'};
+  static const _from = {'expense': 'On an expense', 'policy': 'From an insurance policy', 'note': 'In a note or incident'};
 
   @override
   Widget build(BuildContext context) {

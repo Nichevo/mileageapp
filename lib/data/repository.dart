@@ -261,6 +261,23 @@ class Repository {
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
 
+  // ---- notes and incidents -----------------------------------------------
+
+  /// Notes of a vehicle (every vehicle's when null), newest first.
+  Stream<List<CarNote>> watchNotes(String? vehicleId) => (db.select(db.carNotes)
+        ..where((n) => vehicleId == null ? const Constant(true) : n.vehicleId.equals(vehicleId))
+        ..orderBy([(n) => OrderingTerm.desc(n.at)]))
+      .watch();
+
+  Stream<CarNote?> watchNote(String id) => (db.select(db.carNotes)..where((n) => n.id.equals(id))).watchSingleOrNull();
+
+  Future<void> upsertNote(CarNotesCompanion n) => db.into(db.carNotes).insertOnConflictUpdate(n);
+
+  Future<void> deleteNote(String id) => (db.delete(db.carNotes)..where((n) => n.id.equals(id))).go();
+
+  Future<void> setAttachmentPlace(String id, double lat, double lon) =>
+      (db.update(db.attachments)..where((a) => a.id.equals(id))).write(AttachmentsCompanion(lat: Value(lat), lon: Value(lon)));
+
   // ---- vehicle values ----------------------------------------------------
 
   /// Known values of a vehicle (every vehicle's when null), oldest first.

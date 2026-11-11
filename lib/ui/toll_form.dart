@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../app.dart';
 import '../data/database.dart';
 import '../data/repository.dart';
+import '../data/attachment_store.dart';
+import 'attachments.dart';
 import 'format.dart';
 
 /// NZTA page for paying a toll (or opening a toll account).
@@ -41,6 +43,7 @@ Future<void> editTollParking(
   final cost = TextEditingController(text: existing?.cost.toStringAsFixed(2) ?? (k == 'toll' && last != null ? last.cost.toStringAsFixed(2) : ''));
   final where = TextEditingController(text: existing?.location ?? place ?? '');
   final notes = TextEditingController(text: existing?.notes ?? '');
+  final id = existing?.id ?? newId();
   if (!context.mounted) return;
   final result = await showDialog<String>(
     context: context,
@@ -83,6 +86,8 @@ Future<void> editTollParking(
               ),
               const SizedBox(height: 12),
               TextField(controller: notes, decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              AttachmentStrip(vehicleId: vid, ownerKind: 'expense', ownerId: id, docType: 'other'),
             ]),
           ),
           actions: [
@@ -94,12 +99,16 @@ Future<void> editTollParking(
       },
     ),
   );
+  Future<void> dropFiles() => AttachmentStore.get().then((s) => s.removeOwner(repo, 'expense', id), onError: (_) {});
   if (result == 'delete') {
+    await dropFiles();
     await repo.deleteExpense(existing!.id);
+  } else if (result != 'save' && existing == null) {
+    await dropFiles(); // photos added to a toll or parking that was never saved
   } else if (result == 'save') {
     final place = where.text.trim();
     await repo.upsertExpense(ExpensesCompanion(
-      id: Value(existing?.id ?? newId()),
+      id: Value(id),
       vehicleId: Value(vid),
       at: Value(when),
       kind: Value(k),

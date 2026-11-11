@@ -111,8 +111,6 @@ class ExpenseDetailPage extends StatelessWidget {
               if (e.tripId != null)
                 row('Trip', 'Open the trip', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailPage(tripId: e.tripId!)))),
               const SizedBox(height: 20),
-              Text('Photos and documents', style: t.titleSmall),
-              const SizedBox(height: 8),
               AttachmentStrip(vehicleId: e.vehicleId, ownerKind: 'expense', ownerId: e.id, docType: docTypeForExpense(e.kind)),
               const SizedBox(height: 4),
               Align(

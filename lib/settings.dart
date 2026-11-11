@@ -12,6 +12,10 @@ class Settings {
   Settings._(this._p);
 
   /// Version of the light-phase counting that every trip has been recounted with.
+  /// The trip whose parking spot was hidden from Home.
+  String? get parkedHidden => _p.getString('parkedHidden');
+  Future<void> setParkedHidden(String id) => _p.setString('parkedHidden', id);
+
   int get lightCountVersion => _p.getInt('lightCountVersion') ?? 1;
   Future<void> setLightCountVersion(int v) => _p.setInt('lightCountVersion', v);
 

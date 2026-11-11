@@ -19,6 +19,8 @@ import 'insights_page.dart' show ChartScale;
 import 'prices_page.dart' show FuelPriceCard;
 import 'import_page.dart';
 import 'loan_car_page.dart' show LoanBanner;
+import 'home_status.dart';
+import 'notes_page.dart' show newNote;
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -77,10 +79,14 @@ class _Dashboard extends StatelessWidget {
             const Icon(Icons.arrow_drop_down),
           ]),
         ),
+        actions: [
+          IconButton(tooltip: 'Note or accident', icon: const Icon(Icons.car_crash_outlined), onPressed: () => newNote(context)),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          const LiveTripCard(),
           Row(children: [
             if (usesFuel(kind))
               Expanded(
@@ -104,7 +110,10 @@ class _Dashboard extends StatelessWidget {
           ]),
           const SizedBox(height: 12),
           if (vehicle != null && vehicle!.ownership != 'own') LoanBanner(vehicle: vehicle!),
+          if (vehicle?.ownership == 'own') const KeyDatesCard(),
           const ComingUpCard(),
+          const ParkedCard(),
+          if (vehicle?.ownership == 'own') const TyreHomeCard(),
           if (usesFuel(kind)) FuelPriceCard(events: events.where((e) => e.kind == 'fuel').toList()),
           if (vehicle?.ownership == 'own' && (latestEconomyChange(stats) ?? 0) >= 0.15)
             Card(

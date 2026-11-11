@@ -22,6 +22,8 @@ import 'prices_page.dart';
 import 'sharetank_page.dart';
 import 'vehicle_page.dart';
 import 'costs_page.dart';
+import 'notes_page.dart';
+import 'tyres_page.dart';
 
 class MorePage extends StatefulWidget {
   const MorePage({super.key});
@@ -163,6 +165,18 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Vehicles'),
             subtitle: const Text('Switch, add another, or edit details'),
             onTap: () => showVehicleSwitcher(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.car_crash_outlined),
+            title: const Text('Notes and incidents'),
+            subtitle: const Text('Accident details, photos with time and place, notes'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotesPage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.tire_repair),
+            title: const Text('Tyres'),
+            subtitle: const Text('Pressure checks and tyre sets'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TyresPage())),
           ),
           ListTile(
             leading: const Icon(Icons.savings_outlined),

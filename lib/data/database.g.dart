@@ -869,6 +869,651 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
   }
 }
 
+class $CarNotesTable extends CarNotes with TableInfo<$CarNotesTable, CarNote> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CarNotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _vehicleIdMeta = const VerificationMeta(
+    'vehicleId',
+  );
+  @override
+  late final GeneratedColumn<String> vehicleId = GeneratedColumn<String>(
+    'vehicle_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES vehicles (id)',
+    ),
+  );
+  static const VerificationMeta _atMeta = const VerificationMeta('at');
+  @override
+  late final GeneratedColumn<DateTime> at = GeneratedColumn<DateTime>(
+    'at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('note'),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fieldsJsonMeta = const VerificationMeta(
+    'fieldsJson',
+  );
+  @override
+  late final GeneratedColumn<String> fieldsJson = GeneratedColumn<String>(
+    'fields_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _latMeta = const VerificationMeta('lat');
+  @override
+  late final GeneratedColumn<double> lat = GeneratedColumn<double>(
+    'lat',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lonMeta = const VerificationMeta('lon');
+  @override
+  late final GeneratedColumn<double> lon = GeneratedColumn<double>(
+    'lon',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _accuracyMMeta = const VerificationMeta(
+    'accuracyM',
+  );
+  @override
+  late final GeneratedColumn<double> accuracyM = GeneratedColumn<double>(
+    'accuracy_m',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    vehicleId,
+    at,
+    kind,
+    title,
+    body,
+    fieldsJson,
+    lat,
+    lon,
+    accuracyM,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'car_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CarNote> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('vehicle_id')) {
+      context.handle(
+        _vehicleIdMeta,
+        vehicleId.isAcceptableOrUnknown(data['vehicle_id']!, _vehicleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_vehicleIdMeta);
+    }
+    if (data.containsKey('at')) {
+      context.handle(_atMeta, at.isAcceptableOrUnknown(data['at']!, _atMeta));
+    } else if (isInserting) {
+      context.missing(_atMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    }
+    if (data.containsKey('fields_json')) {
+      context.handle(
+        _fieldsJsonMeta,
+        fieldsJson.isAcceptableOrUnknown(data['fields_json']!, _fieldsJsonMeta),
+      );
+    }
+    if (data.containsKey('lat')) {
+      context.handle(
+        _latMeta,
+        lat.isAcceptableOrUnknown(data['lat']!, _latMeta),
+      );
+    }
+    if (data.containsKey('lon')) {
+      context.handle(
+        _lonMeta,
+        lon.isAcceptableOrUnknown(data['lon']!, _lonMeta),
+      );
+    }
+    if (data.containsKey('accuracy_m')) {
+      context.handle(
+        _accuracyMMeta,
+        accuracyM.isAcceptableOrUnknown(data['accuracy_m']!, _accuracyMMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CarNote map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CarNote(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      vehicleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vehicle_id'],
+      )!,
+      at: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}at'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      ),
+      fieldsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fields_json'],
+      ),
+      lat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lat'],
+      ),
+      lon: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lon'],
+      ),
+      accuracyM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}accuracy_m'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CarNotesTable createAlias(String alias) {
+    return $CarNotesTable(attachedDatabase, alias);
+  }
+}
+
+class CarNote extends DataClass implements Insertable<CarNote> {
+  final String id;
+  final String vehicleId;
+  final DateTime at;
+
+  /// 'incident' or 'note'
+  final String kind;
+  final String? title;
+  final String? body;
+
+  /// Incident details (other driver, plate, insurer...) as a JSON object.
+  final String? fieldsJson;
+  final double? lat;
+  final double? lon;
+  final double? accuracyM;
+  final DateTime createdAt;
+  const CarNote({
+    required this.id,
+    required this.vehicleId,
+    required this.at,
+    required this.kind,
+    this.title,
+    this.body,
+    this.fieldsJson,
+    this.lat,
+    this.lon,
+    this.accuracyM,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['vehicle_id'] = Variable<String>(vehicleId);
+    map['at'] = Variable<DateTime>(at);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || body != null) {
+      map['body'] = Variable<String>(body);
+    }
+    if (!nullToAbsent || fieldsJson != null) {
+      map['fields_json'] = Variable<String>(fieldsJson);
+    }
+    if (!nullToAbsent || lat != null) {
+      map['lat'] = Variable<double>(lat);
+    }
+    if (!nullToAbsent || lon != null) {
+      map['lon'] = Variable<double>(lon);
+    }
+    if (!nullToAbsent || accuracyM != null) {
+      map['accuracy_m'] = Variable<double>(accuracyM);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CarNotesCompanion toCompanion(bool nullToAbsent) {
+    return CarNotesCompanion(
+      id: Value(id),
+      vehicleId: Value(vehicleId),
+      at: Value(at),
+      kind: Value(kind),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      body: body == null && nullToAbsent ? const Value.absent() : Value(body),
+      fieldsJson: fieldsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fieldsJson),
+      lat: lat == null && nullToAbsent ? const Value.absent() : Value(lat),
+      lon: lon == null && nullToAbsent ? const Value.absent() : Value(lon),
+      accuracyM: accuracyM == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accuracyM),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CarNote.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CarNote(
+      id: serializer.fromJson<String>(json['id']),
+      vehicleId: serializer.fromJson<String>(json['vehicleId']),
+      at: serializer.fromJson<DateTime>(json['at']),
+      kind: serializer.fromJson<String>(json['kind']),
+      title: serializer.fromJson<String?>(json['title']),
+      body: serializer.fromJson<String?>(json['body']),
+      fieldsJson: serializer.fromJson<String?>(json['fieldsJson']),
+      lat: serializer.fromJson<double?>(json['lat']),
+      lon: serializer.fromJson<double?>(json['lon']),
+      accuracyM: serializer.fromJson<double?>(json['accuracyM']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'vehicleId': serializer.toJson<String>(vehicleId),
+      'at': serializer.toJson<DateTime>(at),
+      'kind': serializer.toJson<String>(kind),
+      'title': serializer.toJson<String?>(title),
+      'body': serializer.toJson<String?>(body),
+      'fieldsJson': serializer.toJson<String?>(fieldsJson),
+      'lat': serializer.toJson<double?>(lat),
+      'lon': serializer.toJson<double?>(lon),
+      'accuracyM': serializer.toJson<double?>(accuracyM),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CarNote copyWith({
+    String? id,
+    String? vehicleId,
+    DateTime? at,
+    String? kind,
+    Value<String?> title = const Value.absent(),
+    Value<String?> body = const Value.absent(),
+    Value<String?> fieldsJson = const Value.absent(),
+    Value<double?> lat = const Value.absent(),
+    Value<double?> lon = const Value.absent(),
+    Value<double?> accuracyM = const Value.absent(),
+    DateTime? createdAt,
+  }) => CarNote(
+    id: id ?? this.id,
+    vehicleId: vehicleId ?? this.vehicleId,
+    at: at ?? this.at,
+    kind: kind ?? this.kind,
+    title: title.present ? title.value : this.title,
+    body: body.present ? body.value : this.body,
+    fieldsJson: fieldsJson.present ? fieldsJson.value : this.fieldsJson,
+    lat: lat.present ? lat.value : this.lat,
+    lon: lon.present ? lon.value : this.lon,
+    accuracyM: accuracyM.present ? accuracyM.value : this.accuracyM,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  CarNote copyWithCompanion(CarNotesCompanion data) {
+    return CarNote(
+      id: data.id.present ? data.id.value : this.id,
+      vehicleId: data.vehicleId.present ? data.vehicleId.value : this.vehicleId,
+      at: data.at.present ? data.at.value : this.at,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      title: data.title.present ? data.title.value : this.title,
+      body: data.body.present ? data.body.value : this.body,
+      fieldsJson: data.fieldsJson.present
+          ? data.fieldsJson.value
+          : this.fieldsJson,
+      lat: data.lat.present ? data.lat.value : this.lat,
+      lon: data.lon.present ? data.lon.value : this.lon,
+      accuracyM: data.accuracyM.present ? data.accuracyM.value : this.accuracyM,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CarNote(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('at: $at, ')
+          ..write('kind: $kind, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('fieldsJson: $fieldsJson, ')
+          ..write('lat: $lat, ')
+          ..write('lon: $lon, ')
+          ..write('accuracyM: $accuracyM, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    vehicleId,
+    at,
+    kind,
+    title,
+    body,
+    fieldsJson,
+    lat,
+    lon,
+    accuracyM,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CarNote &&
+          other.id == this.id &&
+          other.vehicleId == this.vehicleId &&
+          other.at == this.at &&
+          other.kind == this.kind &&
+          other.title == this.title &&
+          other.body == this.body &&
+          other.fieldsJson == this.fieldsJson &&
+          other.lat == this.lat &&
+          other.lon == this.lon &&
+          other.accuracyM == this.accuracyM &&
+          other.createdAt == this.createdAt);
+}
+
+class CarNotesCompanion extends UpdateCompanion<CarNote> {
+  final Value<String> id;
+  final Value<String> vehicleId;
+  final Value<DateTime> at;
+  final Value<String> kind;
+  final Value<String?> title;
+  final Value<String?> body;
+  final Value<String?> fieldsJson;
+  final Value<double?> lat;
+  final Value<double?> lon;
+  final Value<double?> accuracyM;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CarNotesCompanion({
+    this.id = const Value.absent(),
+    this.vehicleId = const Value.absent(),
+    this.at = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.fieldsJson = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lon = const Value.absent(),
+    this.accuracyM = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CarNotesCompanion.insert({
+    required String id,
+    required String vehicleId,
+    required DateTime at,
+    this.kind = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.fieldsJson = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lon = const Value.absent(),
+    this.accuracyM = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       vehicleId = Value(vehicleId),
+       at = Value(at);
+  static Insertable<CarNote> custom({
+    Expression<String>? id,
+    Expression<String>? vehicleId,
+    Expression<DateTime>? at,
+    Expression<String>? kind,
+    Expression<String>? title,
+    Expression<String>? body,
+    Expression<String>? fieldsJson,
+    Expression<double>? lat,
+    Expression<double>? lon,
+    Expression<double>? accuracyM,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (vehicleId != null) 'vehicle_id': vehicleId,
+      if (at != null) 'at': at,
+      if (kind != null) 'kind': kind,
+      if (title != null) 'title': title,
+      if (body != null) 'body': body,
+      if (fieldsJson != null) 'fields_json': fieldsJson,
+      if (lat != null) 'lat': lat,
+      if (lon != null) 'lon': lon,
+      if (accuracyM != null) 'accuracy_m': accuracyM,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CarNotesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? vehicleId,
+    Value<DateTime>? at,
+    Value<String>? kind,
+    Value<String?>? title,
+    Value<String?>? body,
+    Value<String?>? fieldsJson,
+    Value<double?>? lat,
+    Value<double?>? lon,
+    Value<double?>? accuracyM,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return CarNotesCompanion(
+      id: id ?? this.id,
+      vehicleId: vehicleId ?? this.vehicleId,
+      at: at ?? this.at,
+      kind: kind ?? this.kind,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      fieldsJson: fieldsJson ?? this.fieldsJson,
+      lat: lat ?? this.lat,
+      lon: lon ?? this.lon,
+      accuracyM: accuracyM ?? this.accuracyM,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (vehicleId.present) {
+      map['vehicle_id'] = Variable<String>(vehicleId.value);
+    }
+    if (at.present) {
+      map['at'] = Variable<DateTime>(at.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (fieldsJson.present) {
+      map['fields_json'] = Variable<String>(fieldsJson.value);
+    }
+    if (lat.present) {
+      map['lat'] = Variable<double>(lat.value);
+    }
+    if (lon.present) {
+      map['lon'] = Variable<double>(lon.value);
+    }
+    if (accuracyM.present) {
+      map['accuracy_m'] = Variable<double>(accuracyM.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CarNotesCompanion(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('at: $at, ')
+          ..write('kind: $kind, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('fieldsJson: $fieldsJson, ')
+          ..write('lat: $lat, ')
+          ..write('lon: $lon, ')
+          ..write('accuracyM: $accuracyM, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $VehicleValuesTable extends VehicleValues
     with TableInfo<$VehicleValuesTable, VehicleValue> {
   @override
@@ -1400,6 +2045,24 @@ class $AttachmentsTable extends Attachments
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _latMeta = const VerificationMeta('lat');
+  @override
+  late final GeneratedColumn<double> lat = GeneratedColumn<double>(
+    'lat',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lonMeta = const VerificationMeta('lon');
+  @override
+  late final GeneratedColumn<double> lon = GeneratedColumn<double>(
+    'lon',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1413,6 +2076,8 @@ class $AttachmentsTable extends Attachments
     sizeBytes,
     docDate,
     addedAt,
+    lat,
+    lon,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1501,6 +2166,18 @@ class $AttachmentsTable extends Attachments
         addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
       );
     }
+    if (data.containsKey('lat')) {
+      context.handle(
+        _latMeta,
+        lat.isAcceptableOrUnknown(data['lat']!, _latMeta),
+      );
+    }
+    if (data.containsKey('lon')) {
+      context.handle(
+        _lonMeta,
+        lon.isAcceptableOrUnknown(data['lon']!, _lonMeta),
+      );
+    }
     return context;
   }
 
@@ -1554,6 +2231,14 @@ class $AttachmentsTable extends Attachments
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
       )!,
+      lat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lat'],
+      ),
+      lon: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lon'],
+      ),
     );
   }
 
@@ -1583,6 +2268,10 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   /// The document's own date (invoice date), when known.
   final DateTime? docDate;
   final DateTime addedAt;
+
+  /// v8: where a photo was taken, when the phone could tell.
+  final double? lat;
+  final double? lon;
   const Attachment({
     required this.id,
     required this.vehicleId,
@@ -1595,6 +2284,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     required this.sizeBytes,
     this.docDate,
     required this.addedAt,
+    this.lat,
+    this.lon,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1614,6 +2305,12 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       map['doc_date'] = Variable<DateTime>(docDate);
     }
     map['added_at'] = Variable<DateTime>(addedAt);
+    if (!nullToAbsent || lat != null) {
+      map['lat'] = Variable<double>(lat);
+    }
+    if (!nullToAbsent || lon != null) {
+      map['lon'] = Variable<double>(lon);
+    }
     return map;
   }
 
@@ -1634,6 +2331,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           ? const Value.absent()
           : Value(docDate),
       addedAt: Value(addedAt),
+      lat: lat == null && nullToAbsent ? const Value.absent() : Value(lat),
+      lon: lon == null && nullToAbsent ? const Value.absent() : Value(lon),
     );
   }
 
@@ -1654,6 +2353,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
       docDate: serializer.fromJson<DateTime?>(json['docDate']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      lat: serializer.fromJson<double?>(json['lat']),
+      lon: serializer.fromJson<double?>(json['lon']),
     );
   }
   @override
@@ -1671,6 +2372,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       'sizeBytes': serializer.toJson<int>(sizeBytes),
       'docDate': serializer.toJson<DateTime?>(docDate),
       'addedAt': serializer.toJson<DateTime>(addedAt),
+      'lat': serializer.toJson<double?>(lat),
+      'lon': serializer.toJson<double?>(lon),
     };
   }
 
@@ -1686,6 +2389,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     int? sizeBytes,
     Value<DateTime?> docDate = const Value.absent(),
     DateTime? addedAt,
+    Value<double?> lat = const Value.absent(),
+    Value<double?> lon = const Value.absent(),
   }) => Attachment(
     id: id ?? this.id,
     vehicleId: vehicleId ?? this.vehicleId,
@@ -1698,6 +2403,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     sizeBytes: sizeBytes ?? this.sizeBytes,
     docDate: docDate.present ? docDate.value : this.docDate,
     addedAt: addedAt ?? this.addedAt,
+    lat: lat.present ? lat.value : this.lat,
+    lon: lon.present ? lon.value : this.lon,
   );
   Attachment copyWithCompanion(AttachmentsCompanion data) {
     return Attachment(
@@ -1712,6 +2419,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
       docDate: data.docDate.present ? data.docDate.value : this.docDate,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      lat: data.lat.present ? data.lat.value : this.lat,
+      lon: data.lon.present ? data.lon.value : this.lon,
     );
   }
 
@@ -1728,7 +2437,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           ..write('mimeType: $mimeType, ')
           ..write('sizeBytes: $sizeBytes, ')
           ..write('docDate: $docDate, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('lat: $lat, ')
+          ..write('lon: $lon')
           ..write(')'))
         .toString();
   }
@@ -1746,6 +2457,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     sizeBytes,
     docDate,
     addedAt,
+    lat,
+    lon,
   );
   @override
   bool operator ==(Object other) =>
@@ -1761,7 +2474,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           other.mimeType == this.mimeType &&
           other.sizeBytes == this.sizeBytes &&
           other.docDate == this.docDate &&
-          other.addedAt == this.addedAt);
+          other.addedAt == this.addedAt &&
+          other.lat == this.lat &&
+          other.lon == this.lon);
 }
 
 class AttachmentsCompanion extends UpdateCompanion<Attachment> {
@@ -1776,6 +2491,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
   final Value<int> sizeBytes;
   final Value<DateTime?> docDate;
   final Value<DateTime> addedAt;
+  final Value<double?> lat;
+  final Value<double?> lon;
   final Value<int> rowid;
   const AttachmentsCompanion({
     this.id = const Value.absent(),
@@ -1789,6 +2506,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.sizeBytes = const Value.absent(),
     this.docDate = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lon = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AttachmentsCompanion.insert({
@@ -1803,6 +2522,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.sizeBytes = const Value.absent(),
     this.docDate = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lon = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        vehicleId = Value(vehicleId),
@@ -1822,6 +2543,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Expression<int>? sizeBytes,
     Expression<DateTime>? docDate,
     Expression<DateTime>? addedAt,
+    Expression<double>? lat,
+    Expression<double>? lon,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1836,6 +2559,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       if (sizeBytes != null) 'size_bytes': sizeBytes,
       if (docDate != null) 'doc_date': docDate,
       if (addedAt != null) 'added_at': addedAt,
+      if (lat != null) 'lat': lat,
+      if (lon != null) 'lon': lon,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1852,6 +2577,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Value<int>? sizeBytes,
     Value<DateTime?>? docDate,
     Value<DateTime>? addedAt,
+    Value<double?>? lat,
+    Value<double?>? lon,
     Value<int>? rowid,
   }) {
     return AttachmentsCompanion(
@@ -1866,6 +2593,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       sizeBytes: sizeBytes ?? this.sizeBytes,
       docDate: docDate ?? this.docDate,
       addedAt: addedAt ?? this.addedAt,
+      lat: lat ?? this.lat,
+      lon: lon ?? this.lon,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1906,6 +2635,12 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
     }
+    if (lat.present) {
+      map['lat'] = Variable<double>(lat.value);
+    }
+    if (lon.present) {
+      map['lon'] = Variable<double>(lon.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1926,6 +2661,8 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
           ..write('sizeBytes: $sizeBytes, ')
           ..write('docDate: $docDate, ')
           ..write('addedAt: $addedAt, ')
+          ..write('lat: $lat, ')
+          ..write('lon: $lon, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10325,6 +11062,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $VehiclesTable vehicles = $VehiclesTable(this);
+  late final $CarNotesTable carNotes = $CarNotesTable(this);
   late final $VehicleValuesTable vehicleValues = $VehicleValuesTable(this);
   late final $AttachmentsTable attachments = $AttachmentsTable(this);
   late final $StationsTable stations = $StationsTable(this);
@@ -10346,6 +11084,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     vehicles,
+    carNotes,
     vehicleValues,
     attachments,
     stations,
@@ -10405,6 +11144,25 @@ typedef $$VehiclesTableUpdateCompanionBuilder =
 final class $$VehiclesTableReferences
     extends BaseReferences<_$AppDatabase, $VehiclesTable, Vehicle> {
   $$VehiclesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$CarNotesTable, List<CarNote>> _carNotesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.carNotes,
+    aliasName: $_aliasNameGenerator(db.vehicles.id, db.carNotes.vehicleId),
+  );
+
+  $$CarNotesTableProcessedTableManager get carNotesRefs {
+    final manager = $$CarNotesTableTableManager(
+      $_db,
+      $_db.carNotes,
+    ).filter((f) => f.vehicleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_carNotesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 
   static MultiTypedResultKey<$VehicleValuesTable, List<VehicleValue>>
   _vehicleValuesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -10661,6 +11419,31 @@ class $$VehiclesTableFilterComposer
     column: $table.loanJson,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> carNotesRefs(
+    Expression<bool> Function($$CarNotesTableFilterComposer f) f,
+  ) {
+    final $$CarNotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.carNotes,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CarNotesTableFilterComposer(
+            $db: $db,
+            $table: $db.carNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<bool> vehicleValuesRefs(
     Expression<bool> Function($$VehicleValuesTableFilterComposer f) f,
@@ -11035,6 +11818,31 @@ class $$VehiclesTableAnnotationComposer
   GeneratedColumn<String> get loanJson =>
       $composableBuilder(column: $table.loanJson, builder: (column) => column);
 
+  Expression<T> carNotesRefs<T extends Object>(
+    Expression<T> Function($$CarNotesTableAnnotationComposer a) f,
+  ) {
+    final $$CarNotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.carNotes,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CarNotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.carNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> vehicleValuesRefs<T extends Object>(
     Expression<T> Function($$VehicleValuesTableAnnotationComposer a) f,
   ) {
@@ -11276,6 +12084,7 @@ class $$VehiclesTableTableManager
           (Vehicle, $$VehiclesTableReferences),
           Vehicle,
           PrefetchHooks Function({
+            bool carNotesRefs,
             bool vehicleValuesRefs,
             bool attachmentsRefs,
             bool energyEventsRefs,
@@ -11380,6 +12189,7 @@ class $$VehiclesTableTableManager
               .toList(),
           prefetchHooksCallback:
               ({
+                carNotesRefs = false,
                 vehicleValuesRefs = false,
                 attachmentsRefs = false,
                 energyEventsRefs = false,
@@ -11393,6 +12203,7 @@ class $$VehiclesTableTableManager
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (carNotesRefs) db.carNotes,
                     if (vehicleValuesRefs) db.vehicleValues,
                     if (attachmentsRefs) db.attachments,
                     if (energyEventsRefs) db.energyEvents,
@@ -11406,6 +12217,27 @@ class $$VehiclesTableTableManager
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (carNotesRefs)
+                        await $_getPrefetchedData<
+                          Vehicle,
+                          $VehiclesTable,
+                          CarNote
+                        >(
+                          currentTable: table,
+                          referencedTable: $$VehiclesTableReferences
+                              ._carNotesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$VehiclesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).carNotesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.vehicleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (vehicleValuesRefs)
                         await $_getPrefetchedData<
                           Vehicle,
@@ -11616,6 +12448,7 @@ typedef $$VehiclesTableProcessedTableManager =
       (Vehicle, $$VehiclesTableReferences),
       Vehicle,
       PrefetchHooks Function({
+        bool carNotesRefs,
         bool vehicleValuesRefs,
         bool attachmentsRefs,
         bool energyEventsRefs,
@@ -11626,6 +12459,439 @@ typedef $$VehiclesTableProcessedTableManager =
         bool serviceItemsRefs,
         bool insurancePoliciesRefs,
       })
+    >;
+typedef $$CarNotesTableCreateCompanionBuilder =
+    CarNotesCompanion Function({
+      required String id,
+      required String vehicleId,
+      required DateTime at,
+      Value<String> kind,
+      Value<String?> title,
+      Value<String?> body,
+      Value<String?> fieldsJson,
+      Value<double?> lat,
+      Value<double?> lon,
+      Value<double?> accuracyM,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$CarNotesTableUpdateCompanionBuilder =
+    CarNotesCompanion Function({
+      Value<String> id,
+      Value<String> vehicleId,
+      Value<DateTime> at,
+      Value<String> kind,
+      Value<String?> title,
+      Value<String?> body,
+      Value<String?> fieldsJson,
+      Value<double?> lat,
+      Value<double?> lon,
+      Value<double?> accuracyM,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$CarNotesTableReferences
+    extends BaseReferences<_$AppDatabase, $CarNotesTable, CarNote> {
+  $$CarNotesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $VehiclesTable _vehicleIdTable(_$AppDatabase db) => db.vehicles
+      .createAlias($_aliasNameGenerator(db.carNotes.vehicleId, db.vehicles.id));
+
+  $$VehiclesTableProcessedTableManager get vehicleId {
+    final $_column = $_itemColumn<String>('vehicle_id')!;
+
+    final manager = $$VehiclesTableTableManager(
+      $_db,
+      $_db.vehicles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_vehicleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CarNotesTableFilterComposer
+    extends Composer<_$AppDatabase, $CarNotesTable> {
+  $$CarNotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fieldsJson => $composableBuilder(
+    column: $table.fieldsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lon => $composableBuilder(
+    column: $table.lon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get accuracyM => $composableBuilder(
+    column: $table.accuracyM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$VehiclesTableFilterComposer get vehicleId {
+    final $$VehiclesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableFilterComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CarNotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CarNotesTable> {
+  $$CarNotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fieldsJson => $composableBuilder(
+    column: $table.fieldsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lon => $composableBuilder(
+    column: $table.lon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get accuracyM => $composableBuilder(
+    column: $table.accuracyM,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$VehiclesTableOrderingComposer get vehicleId {
+    final $$VehiclesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableOrderingComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CarNotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CarNotesTable> {
+  $$CarNotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get at =>
+      $composableBuilder(column: $table.at, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get fieldsJson => $composableBuilder(
+    column: $table.fieldsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get lat =>
+      $composableBuilder(column: $table.lat, builder: (column) => column);
+
+  GeneratedColumn<double> get lon =>
+      $composableBuilder(column: $table.lon, builder: (column) => column);
+
+  GeneratedColumn<double> get accuracyM =>
+      $composableBuilder(column: $table.accuracyM, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$VehiclesTableAnnotationComposer get vehicleId {
+    final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CarNotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CarNotesTable,
+          CarNote,
+          $$CarNotesTableFilterComposer,
+          $$CarNotesTableOrderingComposer,
+          $$CarNotesTableAnnotationComposer,
+          $$CarNotesTableCreateCompanionBuilder,
+          $$CarNotesTableUpdateCompanionBuilder,
+          (CarNote, $$CarNotesTableReferences),
+          CarNote,
+          PrefetchHooks Function({bool vehicleId})
+        > {
+  $$CarNotesTableTableManager(_$AppDatabase db, $CarNotesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CarNotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CarNotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CarNotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> vehicleId = const Value.absent(),
+                Value<DateTime> at = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> body = const Value.absent(),
+                Value<String?> fieldsJson = const Value.absent(),
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lon = const Value.absent(),
+                Value<double?> accuracyM = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CarNotesCompanion(
+                id: id,
+                vehicleId: vehicleId,
+                at: at,
+                kind: kind,
+                title: title,
+                body: body,
+                fieldsJson: fieldsJson,
+                lat: lat,
+                lon: lon,
+                accuracyM: accuracyM,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String vehicleId,
+                required DateTime at,
+                Value<String> kind = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> body = const Value.absent(),
+                Value<String?> fieldsJson = const Value.absent(),
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lon = const Value.absent(),
+                Value<double?> accuracyM = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CarNotesCompanion.insert(
+                id: id,
+                vehicleId: vehicleId,
+                at: at,
+                kind: kind,
+                title: title,
+                body: body,
+                fieldsJson: fieldsJson,
+                lat: lat,
+                lon: lon,
+                accuracyM: accuracyM,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CarNotesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({vehicleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (vehicleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.vehicleId,
+                                referencedTable: $$CarNotesTableReferences
+                                    ._vehicleIdTable(db),
+                                referencedColumn: $$CarNotesTableReferences
+                                    ._vehicleIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CarNotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CarNotesTable,
+      CarNote,
+      $$CarNotesTableFilterComposer,
+      $$CarNotesTableOrderingComposer,
+      $$CarNotesTableAnnotationComposer,
+      $$CarNotesTableCreateCompanionBuilder,
+      $$CarNotesTableUpdateCompanionBuilder,
+      (CarNote, $$CarNotesTableReferences),
+      CarNote,
+      PrefetchHooks Function({bool vehicleId})
     >;
 typedef $$VehicleValuesTableCreateCompanionBuilder =
     VehicleValuesCompanion Function({
@@ -11982,6 +13248,8 @@ typedef $$AttachmentsTableCreateCompanionBuilder =
       Value<int> sizeBytes,
       Value<DateTime?> docDate,
       Value<DateTime> addedAt,
+      Value<double?> lat,
+      Value<double?> lon,
       Value<int> rowid,
     });
 typedef $$AttachmentsTableUpdateCompanionBuilder =
@@ -11997,6 +13265,8 @@ typedef $$AttachmentsTableUpdateCompanionBuilder =
       Value<int> sizeBytes,
       Value<DateTime?> docDate,
       Value<DateTime> addedAt,
+      Value<double?> lat,
+      Value<double?> lon,
       Value<int> rowid,
     });
 
@@ -12083,6 +13353,16 @@ class $$AttachmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lon => $composableBuilder(
+    column: $table.lon,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$VehiclesTableFilterComposer get vehicleId {
     final $$VehiclesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -12166,6 +13446,16 @@ class $$AttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lon => $composableBuilder(
+    column: $table.lon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$VehiclesTableOrderingComposer get vehicleId {
     final $$VehiclesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -12228,6 +13518,12 @@ class $$AttachmentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get lat =>
+      $composableBuilder(column: $table.lat, builder: (column) => column);
+
+  GeneratedColumn<double> get lon =>
+      $composableBuilder(column: $table.lon, builder: (column) => column);
 
   $$VehiclesTableAnnotationComposer get vehicleId {
     final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
@@ -12292,6 +13588,8 @@ class $$AttachmentsTableTableManager
                 Value<int> sizeBytes = const Value.absent(),
                 Value<DateTime?> docDate = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lon = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion(
                 id: id,
@@ -12305,6 +13603,8 @@ class $$AttachmentsTableTableManager
                 sizeBytes: sizeBytes,
                 docDate: docDate,
                 addedAt: addedAt,
+                lat: lat,
+                lon: lon,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12320,6 +13620,8 @@ class $$AttachmentsTableTableManager
                 Value<int> sizeBytes = const Value.absent(),
                 Value<DateTime?> docDate = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lon = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttachmentsCompanion.insert(
                 id: id,
@@ -12333,6 +13635,8 @@ class $$AttachmentsTableTableManager
                 sizeBytes: sizeBytes,
                 docDate: docDate,
                 addedAt: addedAt,
+                lat: lat,
+                lon: lon,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -17829,6 +19133,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$VehiclesTableTableManager get vehicles =>
       $$VehiclesTableTableManager(_db, _db.vehicles);
+  $$CarNotesTableTableManager get carNotes =>
+      $$CarNotesTableTableManager(_db, _db.carNotes);
   $$VehicleValuesTableTableManager get vehicleValues =>
       $$VehicleValuesTableTableManager(_db, _db.vehicleValues);
   $$AttachmentsTableTableManager get attachments =>

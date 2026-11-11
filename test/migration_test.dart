@@ -26,7 +26,10 @@ void main() {
     await db.close();
 
     db = AppDatabase(NativeDatabase(file, setup: (raw) {
-      if (raw.userVersion == 7) {
+      if (raw.userVersion == 8) {
+        raw.execute('DROP TABLE car_notes');
+        raw.execute('ALTER TABLE attachments DROP COLUMN lat');
+        raw.execute('ALTER TABLE attachments DROP COLUMN lon');
         raw.execute('DROP TABLE vehicle_values');
         raw.execute('ALTER TABLE vehicles DROP COLUMN ownership');
         raw.execute('ALTER TABLE vehicles DROP COLUMN archived_at');
@@ -67,6 +70,32 @@ void main() {
     // v7 vehicle values.
     await db.into(db.vehicleValues).insert(VehicleValuesCompanion.insert(id: 'vv', vehicleId: 'v1', at: DateTime(2020, 1, 1), value: 20000));
     expect((await db.select(db.vehicleValues).get()).single.source, 'estimate');
+    // v8 notes and photo locations.
+    await db.into(db.carNotes).insert(CarNotesCompanion.insert(id: 'n', vehicleId: 'v1', at: DateTime(2026, 1, 1)));
+    expect((await db.select(db.carNotes).get()).single.kind, 'note');
+    expect((await db.select(db.attachments).get()).single.lat, isNull);
+    await db.close();
+    await dir.delete(recursive: true);
+  });
+
+  test('a v7 database (build 34) gains notes and photo locations, keeping attachments', () async {
+    final dir = await Directory.systemTemp.createTemp('mileagelog_migration7');
+    final file = File('${dir.path}/db.sqlite');
+    var db = AppDatabase(NativeDatabase(file));
+    await db.into(db.vehicles).insert(VehiclesCompanion.insert(id: 'v1', name: 'Test car'));
+    await db.into(db.attachments).insert(AttachmentsCompanion.insert(id: 'a1', vehicleId: 'v1', ownerKind: 'vehicle', ownerId: 'v1', fileName: 'a1.jpg', mimeType: 'image/jpeg'));
+    await db.close();
+    db = AppDatabase(NativeDatabase(file, setup: (raw) {
+      if (raw.userVersion == 8) {
+        raw.execute('DROP TABLE car_notes');
+        raw.execute('ALTER TABLE attachments DROP COLUMN lat');
+        raw.execute('ALTER TABLE attachments DROP COLUMN lon');
+        raw.userVersion = 7;
+      }
+    }));
+    expect((await db.select(db.attachments).get()).single.fileName, 'a1.jpg');
+    await db.into(db.carNotes).insert(CarNotesCompanion.insert(id: 'n', vehicleId: 'v1', at: DateTime(2026, 1, 1)));
+    expect((await db.select(db.carNotes).get()).length, 1);
     await db.close();
     await dir.delete(recursive: true);
   });

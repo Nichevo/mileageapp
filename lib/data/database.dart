@@ -299,6 +299,30 @@ class Attachments extends Table {
   /// The document's own date (invoice date), when known.
   DateTimeColumn get docDate => dateTime().nullable()();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
+  /// v8: where a photo was taken, when the phone could tell.
+  RealColumn get lat => real().nullable()();
+  RealColumn get lon => real().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// v8: a quick note, or an accident or incident record, with when and
+/// where it happened. Photos hang off it as attachments (ownerKind 'note').
+@DataClassName('CarNote')
+class CarNotes extends Table {
+  TextColumn get id => text()();
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  DateTimeColumn get at => dateTime()();
+  /// 'incident' or 'note'
+  TextColumn get kind => text().withDefault(const Constant('note'))();
+  TextColumn get title => text().nullable()();
+  TextColumn get body => text().nullable()();
+  /// Incident details (other driver, plate, insurer...) as a JSON object.
+  TextColumn get fieldsJson => text().nullable()();
+  RealColumn get lat => real().nullable()();
+  RealColumn get lon => real().nullable()();
+  RealColumn get accuracyM => real().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -319,6 +343,7 @@ class VehicleValues extends Table {
 }
 
 @DriftDatabase(tables: [
+  CarNotes,
   VehicleValues,
   Attachments,
   Vehicles,
@@ -340,7 +365,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -375,6 +400,14 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 7) {
             await m.createTable(vehicleValues);
+          }
+          if (from < 8) {
+            // Before v5 the attachments table was just created with these.
+            if (from >= 5) {
+              await m.addColumn(attachments, attachments.lat);
+              await m.addColumn(attachments, attachments.lon);
+            }
+            await m.createTable(carNotes);
           }
         },
         beforeOpen: (details) async {
