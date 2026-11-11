@@ -21,7 +21,14 @@ class StretchResult {
   RunStats? runOf(String tripId) => runs.where((r) => r.tripId == tripId).firstOrNull;
 }
 
-typedef _TripData = ({String id, List<GpsSample> samples, List<LightPass> lights, TripWeather? weather});
+/// What [RouteCompare.compareTrip] found for one trip.
+class TripComparison {
+  final List<StretchResult> stretches;
+  final List<({NearMatch match, String name, String? stretch})> near;
+  const TripComparison(this.stretches, this.near);
+}
+
+typedef _TripData = ({String id, String name, List<GpsSample> samples, List<LightPass> lights, TripWeather? weather});
 
 /// Loads a vehicle's trips and matches routes off the main thread.
 class RouteCompare {
@@ -37,6 +44,7 @@ class RouteCompare {
         if ((pts[t.id]?.length ?? 0) > 1)
           (
             id: t.id,
+            name: t.name,
             samples: [for (final p in pts[t.id]!) GpsSample(p.at, p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM)],
             lights: RoadLookup.stored(t.statsJson)?.lights ?? const <LightPass>[],
             weather: t.statsJson == null ? null : TripWeather.fromJson((jsonDecode(t.statsJson!) as Map<String, Object?>)['weather']),
@@ -56,13 +64,22 @@ class RouteCompare {
       );
 
   /// Stretches of one trip that other trips also drove, best first.
-  static Future<List<StretchResult>> forTrip(Repository repo, String vehicleId, String tripId, List<Place> places) async {
+  static Future<List<StretchResult>> forTrip(Repository repo, String vehicleId, String tripId, List<Place> places) async =>
+      (await compareTrip(repo, vehicleId, tripId, places)).stretches;
+
+  /// Stretches shared with other trips, and trips that nearly matched.
+  static Future<TripComparison> compareTrip(Repository repo, String vehicleId, String tripId, List<Place> places) async {
     final (_, data) = await _load(repo, vehicleId);
-    if (data.every((d) => d.id != tripId)) return const [];
+    if (data.every((d) => d.id != tripId)) return const TripComparison([], []);
+    final names = {for (final d in data) d.id: d.name};
     return Isolate.run(() {
       final tracks = _tracks(data);
       final t = tracks.firstWhere((x) => x.id == tripId);
-      return [for (final s in findStretches(t, tracks)) _result(s, places)];
+      final found = findStretches(t, tracks);
+      final shown = [for (final s in found) _result(s, places)];
+      return TripComparison(shown, [
+        for (final n in nearMatches(t, tracks, found)) (match: n, name: names[n.tripId] ?? 'Trip', stretch: n.stretch == null ? null : shown[n.stretch!].name),
+      ]);
     });
   }
 

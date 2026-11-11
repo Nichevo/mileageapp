@@ -17,6 +17,7 @@ import '../domain/stats.dart';
 import '../domain/trip_stats.dart';
 import '../trips/recorder.dart' show TripRecorder;
 import '../trips/road_lookup.dart';
+import '../domain/route_compare.dart' show NearMatch, NearReason;
 import '../trips/route_compare_service.dart';
 import '../trips/weather_lookup.dart';
 import 'export_page.dart' show shareTripGpx;
@@ -323,22 +324,25 @@ class _TripDetailPageState extends State<TripDetailPage> {
       child: Wrap(spacing: 8, runSpacing: 4, children: [end('From', first), if (!roundTrip) end('To', last)]),
     );
   }
-  Future<List<StretchResult>>? _compare;
+  Future<TripComparison>? _compare;
 
-  /// Stretches of this trip that other trips also drove.
+  /// Stretches of this trip that other trips also drove, and trips that
+  /// nearly did.
   Widget _compareSection(BuildContext context, Trip trip) {
     final scope = AppScope.of(context);
-    _compare ??= RouteCompare.forTrip(scope.repo, trip.vehicleId, trip.id, scope.settings.places);
-    return FutureBuilder<List<StretchResult>>(
+    _compare ??= RouteCompare.compareTrip(scope.repo, trip.vehicleId, trip.id, scope.settings.places);
+    return FutureBuilder<TripComparison>(
       future: _compare,
       builder: (context, snap) {
-        final list = snap.data ?? const <StretchResult>[];
-        if (list.isEmpty) return const SizedBox.shrink();
+        final list = snap.data?.stretches ?? const <StretchResult>[];
+        final near = snap.data?.near ?? const [];
+        if (list.isEmpty && near.isEmpty) return const SizedBox.shrink();
         final t = Theme.of(context).textTheme;
         return Padding(
           padding: const EdgeInsets.only(top: 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Compared with other trips', style: t.titleMedium),
+            if (list.isEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('No other trip shares 2 km of this route yet.', style: t.bodySmall)),
             for (final s in list)
               Card(
                 margin: const EdgeInsets.only(top: 8),
@@ -350,6 +354,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RouteComparePage(stretch: s, tripId: trip.id))),
                 ),
               ),
+            if (near.isNotEmpty) NearMatchCard(near: near),
           ]),
         );
       },
@@ -766,5 +771,58 @@ class TripBattery {
     if (charging) return 'Charging ($start% to $end%)';
     final perHour = total.inMinutes >= 10 ? ' · ${(used / (total.inMinutes / 60)).toStringAsFixed(1)}% per hour' : '';
     return '${used <= 0 ? 0 : used}%$perHour';
+  }
+}
+
+/// Why a near match doesn't count yet, in words.
+String nearReasonText(NearMatch m, String? stretch) {
+  final km = m.sharedKm.toStringAsFixed(1);
+  final pieces = m.pieces > 1 ? ' in ${m.pieces} pieces' : '';
+  return switch (m.reason) {
+    NearReason.partCover => 'Drove ${((m.cover ?? 0) * 100).round()}% of ${stretch ?? 'the stretch'}, needs 90%',
+    NearReason.tooShort => 'Same road the same way for $km km$pieces, needs 2 km in one go',
+    NearReason.drift => 'Close for $km km$pieces, but GPS was up to 90 m off (needs within 40 m)',
+    NearReason.opposite => 'Same road the other way for $km km$pieces, which doesn\'t count',
+  };
+}
+
+/// Trips that came close to matching this one, with a score.
+class NearMatchCard extends StatelessWidget {
+  final List<({NearMatch match, String name, String? stretch})> near;
+  const NearMatchCard({super.key, required this.near});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: ExpansionTile(
+        leading: const Icon(Icons.join_inner),
+        title: Text('${near.length} trip${near.length == 1 ? '' : 's'} nearly matched'),
+        subtitle: const Text('How close each came to counting, and why it didn\'t'),
+        shape: const Border(),
+        children: [
+          for (final n in near)
+            ListTile(
+              leading: SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(alignment: Alignment.center, children: [
+                  CircularProgressIndicator(value: n.match.score, strokeWidth: 4, backgroundColor: cs.surfaceContainerHighest),
+                  Text('${(n.match.score * 100).round()}', style: t.labelSmall),
+                ]),
+              ),
+              title: Text('${n.name}, ${fmtDate(n.match.start)} ${TimeOfDay.fromDateTime(n.match.start.toLocal()).format(context)}'),
+              subtitle: Text(nearReasonText(n.match, n.stretch)),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripDetailPage(tripId: n.match.tripId))),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text('Score out of 100: how close the trip came to counting as the same route. 100 would count.', style: t.bodySmall),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -84,6 +84,54 @@ void main() {
     expect(stretchName(best, const []), '3.3 km stretch');
   });
 
+  test('near matches are scored with the reason they do not count', () {
+    final short = moved(drive(174.70, 174.715), const Duration(days: 5)); // about 1.3 km
+    final drift = moved(a, const Duration(days: 6), dLat: 0.0006); // about 67 m off
+    final part = moved(drive(174.70, 174.745), const Duration(days: 8));
+    final far = moved(a, const Duration(days: 9), dLat: 0.05);
+    final tracks = [
+      Track.from('a', a),
+      Track.from('b', b),
+      Track.from('c', c),
+      Track.from('e', e),
+      Track.from('short', short),
+      Track.from('drift', drift),
+      Track.from('part', part),
+      Track.from('far', far),
+    ];
+    final shown = findStretches(tracks.first, tracks);
+    final near = nearMatches(tracks.first, tracks, shown);
+    final why = {for (final n in near) n.tripId: n.reason};
+    final counted = {for (final s in shown) for (final r in s.runs) r.track.id};
+    expect(counted, containsAll(['a', 'e']));
+    expect(why.keys.toSet().intersection(counted), isEmpty);
+    expect(why['short'], NearReason.tooShort);
+    expect(why['drift'], NearReason.drift);
+    expect(why['c'], NearReason.opposite);
+    expect(why.containsKey('far'), isFalse);
+    // Whichever of b and part didn't make the shown stretch covers only part of it.
+    expect([why['b'], why['part']].where((r) => r == NearReason.partCover), hasLength(1));
+    final byId = {for (final n in near) n.tripId: n};
+    expect(byId['short']!.score, closeTo(0.63, 0.08));
+    expect(byId['drift']!.score, closeTo(0.9, 0.01));
+    expect(byId['c']!.score, lessThan(0.11));
+    expect(near.first.score >= near.last.score, isTrue);
+  });
+
+  test('runs by half hour, weekdays and weekends apart', () {
+    RunStats run(DateTime at, int min) => RunStats(tripId: '$at', at: at, km: 3, time: Duration(minutes: min), moving: Duration(minutes: min), stops: 0, maxKmh: 50);
+    final runs = [
+      run(DateTime(2026, 11, 9, 7, 10), 10), // Monday
+      run(DateTime(2026, 11, 10, 7, 25), 12),
+      run(DateTime(2026, 11, 11, 8, 5), 15),
+      run(DateTime(2026, 11, 14, 7, 15), 8), // Saturday
+    ];
+    final wk = timeSlots(runs, weekend: false);
+    expect(wk.map((s) => s.minute), [7 * 60, 8 * 60]);
+    expect(wk.first.runs, hasLength(2));
+    expect(timeSlots(runs, weekend: true).single.runs.single.time, const Duration(minutes: 8));
+  });
+
   testWidgets('trip page compares a stretch with other trips', (tester) async {
     SharedPreferences.setMockInitialValues({'roadLookup': false, 'weatherLookup': false});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -112,6 +160,10 @@ void main() {
     expect(find.text('Compared with other trips'), findsOneWidget);
     expect(find.textContaining('driven 3 times'), findsOneWidget);
     expect(find.textContaining('quickest of 3'), findsOneWidget);
+    expect(find.text('1 trip nearly matched'), findsOneWidget);
+    await tester.tap(find.text('1 trip nearly matched'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('the other way'), findsOneWidget); // trip c
     await tester.tap(find.textContaining('driven 3 times'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Driven 3 times'), findsOneWidget);
@@ -119,6 +171,11 @@ void main() {
     await tester.tap(find.text('Stops'));
     await tester.pump();
     expect(find.text('Each time, best first'), findsOneWidget);
+    await tester.tap(find.text('By time of day'));
+    await tester.pumpAndSettle();
+    expect(find.text('Weekdays, by time you reached it'), findsOneWidget);
+    expect(find.text('Weekends, by time you reached it'), findsOneWidget);
+    expect(find.textContaining('Orange: weekend.'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));

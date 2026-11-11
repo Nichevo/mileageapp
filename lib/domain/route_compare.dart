@@ -15,6 +15,7 @@ const double minStretchKm = 2;
 const double _stepKm = 0.05; // resample every 50 m
 const double _cellKm = 0.1; // grid for finding nearby points
 const double _matchKm = 0.04; // points within 40 m match
+const double _looseMatchKm = 0.09; // near-miss check: within 90 m
 const double _maxHeadingDiff = 60; // and heading the same way
 const double _maxGapKm = 0.3; // unmatched run that doesn't break a stretch
 
@@ -79,10 +80,10 @@ class Track {
   }
 
   /// The nearest point heading the same way, within 40 m.
-  int? nearest(TrackPoint p) {
+  int? nearest(TrackPoint p, {double matchKm = _matchKm}) {
     final (cx, cy) = _cell(p.lat, p.lon, _cellKm);
     int? best;
-    var bestKm = _matchKm;
+    var bestKm = matchKm;
     for (var dx = -1; dx <= 1; dx++) {
       for (var dy = -1; dy <= 1; dy++) {
         for (final j in _grid[(cx + dx, cy + dy)] ?? const <int>[]) {
@@ -160,7 +161,7 @@ class Overlap {
 
 /// Stretches at least [minKm] long where a and b follow the same road the
 /// same way.
-List<Overlap> overlaps(Track a, Track b, {double minKm = minStretchKm}) {
+List<Overlap> overlaps(Track a, Track b, {double minKm = minStretchKm, double matchKm = _matchKm}) {
   if (a.pts.isEmpty || b.pts.isEmpty) return const [];
   if (a.coarse.intersection(b.coarse).length < 3) return const [];
   final out = <Overlap>[];
@@ -174,7 +175,7 @@ List<Overlap> overlaps(Track a, Track b, {double minKm = minStretchKm}) {
   }
 
   for (var i = 0; i < a.pts.length; i++) {
-    final j = b.nearest(a.pts[i]);
+    final j = b.nearest(a.pts[i], matchKm: matchKm);
     if (j == null) {
       if (lastI != null && a.pts[i].km - a.pts[lastI!].km > _maxGapKm) close();
       continue;
@@ -391,4 +392,100 @@ String stretchName(Stretch s, List<Place> places) {
   final title = placeTitle(a, b);
   final km = '${s.km.toStringAsFixed(1)} km';
   return title == null ? '$km stretch' : '$title ($km)';
+}
+
+/// Where a trip set off on a stretch, by half hour of the day.
+class TimeSlot {
+  final int minute; // minutes after midnight the slot starts
+  final List<RunStats> runs;
+  const TimeSlot(this.minute, this.runs);
+}
+
+/// Runs grouped by the half hour they reached the stretch, weekdays and
+/// weekends kept apart because traffic differs. Slots without runs are left out.
+List<TimeSlot> timeSlots(List<RunStats> runs, {required bool weekend, int slotMin = 30}) {
+  final g = <int, List<RunStats>>{};
+  for (final r in runs) {
+    final l = r.at.toLocal();
+    if ((l.weekday >= DateTime.saturday) != weekend) continue;
+    final m = (l.hour * 60 + l.minute) ~/ slotMin * slotMin;
+    (g[m] ??= []).add(r);
+  }
+  final keys = g.keys.toList()..sort();
+  return [for (final k in keys) TimeSlot(k, g[k]!)];
+}
+
+/// Why another trip isn't (quite) counted as driving the same road.
+enum NearReason {
+  /// Shares the stretch, but less than 90% of it.
+  partCover,
+  /// Shares road the same way, but under 2 km in one go.
+  tooShort,
+  /// Would match if GPS points within 90 m counted (40 m is the rule).
+  drift,
+  /// Same road, driven the other way.
+  opposite,
+}
+
+/// A trip that nearly matched this one, with a 0–1 score of how close it came
+/// (1 would count).
+class NearMatch {
+  final String tripId;
+  final DateTime start;
+  final double score;
+  final NearReason reason;
+  final double sharedKm; // same way, within 40 m (or other-way / 90 m km for those reasons)
+  final int pieces;
+  final int? stretch; // index into the stretches shown, for partCover
+  final double? cover; // share of that stretch driven
+  const NearMatch(this.tripId, this.start, this.score, this.reason, this.sharedKm, {this.pieces = 1, this.stretch, this.cover});
+}
+
+double _sum(List<Overlap> o) => o.fold(0.0, (a, x) => a + x.km);
+
+/// Trips that came close to matching [t] but don't count on [shown], best
+/// first. Trips already on a shown stretch are left out.
+List<NearMatch> nearMatches(Track t, Iterable<Track> others, List<Stretch> shown, {int max = 6, double cover = 0.9}) {
+  final counted = {for (final s in shown) for (final r in s.runs) r.track.id};
+  final out = <NearMatch>[];
+  for (final o in others) {
+    if (o.id == t.id || counted.contains(o.id) || o.pts.isEmpty) continue;
+    if (t.coarse.intersection(o.coarse).length < 3) continue;
+    final same = overlaps(t, o, minKm: 0.3);
+    final sameKm = _sum(same);
+    if (same.any((x) => x.km >= minStretchKm)) {
+      // It shares a full stretch, just not enough of the one shown.
+      var best = 0.0;
+      int? bestI;
+      for (final (i, s) in shown.indexed) {
+        final got = same.fold(0.0, (a, x) => a + math.max(0.0, math.min(x.a1, s.to) - math.max(x.a0, s.from))) / s.km;
+        if (got > best) {
+          best = got;
+          bestI = i;
+        }
+      }
+      if (bestI != null && best > 0.3) {
+        out.add(NearMatch(o.id, o.start, math.min(0.99, best / cover), NearReason.partCover, sameKm, stretch: bestI, cover: best));
+      }
+      continue;
+    }
+    if (sameKm >= 0.5) {
+      out.add(NearMatch(o.id, o.start, math.min(0.99, same.map((x) => x.km).reduce(math.max) / minStretchKm), NearReason.tooShort, sameKm, pieces: same.length));
+      continue;
+    }
+    final loose = overlaps(t, o, minKm: 0.5, matchKm: _looseMatchKm);
+    final looseKm = _sum(loose);
+    if (looseKm >= 0.5) {
+      out.add(NearMatch(o.id, o.start, math.min(0.9, 0.9 * loose.map((x) => x.km).reduce(math.max) / minStretchKm), NearReason.drift, looseKm, pieces: loose.length));
+      continue;
+    }
+    final back = overlaps(t, Track.from(o.id, o.samples.reversed.toList()), minKm: 0.5);
+    final backKm = _sum(back);
+    if (backKm >= 0.5) {
+      // Never counts, so it scores low; still worth knowing.
+      out.add(NearMatch(o.id, o.start, 0.1 * math.min(1.0, backKm / minStretchKm), NearReason.opposite, backKm, pieces: back.length));
+    }
+  }
+  out.sort((a, b) => b.score.compareTo(a.score));
+  return out.take(max).toList();
 }

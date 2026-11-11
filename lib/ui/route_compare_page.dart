@@ -70,6 +70,57 @@ class RouteComparePage extends StatefulWidget {
 
 class _RouteComparePageState extends State<RouteComparePage> {
   var _factor = CompareFactor.time;
+  var _byHour = false;
+
+  static String _clock(BuildContext context, int minute) => TimeOfDay(hour: minute ~/ 60 % 24, minute: minute % 60).format(context);
+
+  /// Half-hour slots for weekdays and weekends, with the quickest weekday slot.
+  List<Widget> _slotTable(BuildContext context, List<RunStats> runs) {
+    final t = Theme.of(context).textTheme;
+    final out = <Widget>[];
+    for (final weekend in [false, true]) {
+      final slots = timeSlots(runs, weekend: weekend);
+      if (slots.isEmpty) continue;
+      double usual(TimeSlot s) => median([for (final r in s.runs) _factor.value(r)!]);
+      final multi = [for (final s in slots) if (s.runs.length >= 2) s];
+      TimeSlot? best;
+      if (multi.length >= 2) {
+        best = multi.reduce((a, b) => (_factor.lowerIsBetter ? usual(a) <= usual(b) : usual(a) >= usual(b)) ? a : b);
+      }
+      out.add(Padding(
+        padding: const EdgeInsets.only(top: 16, bottom: 4),
+        child: Text(weekend ? 'Weekends, by time you reached it' : 'Weekdays, by time you reached it', style: t.titleSmall),
+      ));
+      if (best != null) {
+        out.add(Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text('Best ${_factor.label.toLowerCase()}: ${_clock(context, best.minute)} to ${_clock(context, best.minute + 30)} (usually ${_factor.format(usual(best))})',
+              style: t.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
+        ));
+      }
+      for (final sl in slots) {
+        out.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(children: [
+            Expanded(child: Text('${_clock(context, sl.minute)} to ${_clock(context, sl.minute + 30)}', style: t.bodyMedium)),
+            Text('${sl.runs.length} run${sl.runs.length == 1 ? '' : 's'}   ', style: t.bodySmall),
+            SizedBox(
+              width: 96,
+              child: Text(_factor.format(usual(sl)),
+                  textAlign: TextAlign.end, style: t.bodyMedium?.copyWith(fontWeight: sl == best ? FontWeight.w700 : FontWeight.w500)),
+            ),
+          ]),
+        ));
+      }
+    }
+    if (out.isNotEmpty) {
+      out.add(Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text('Half-hour slots. With one run in a slot it\'s just that run; with more it\'s the usual (middle) figure.', style: t.bodySmall),
+      ));
+    }
+    return out;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +133,13 @@ class _RouteComparePageState extends State<RouteComparePage> {
     final values = [for (final r in runs) _factor.value(r)!];
     final groups = groupMedians(runs, (r) => _factor.value(r)!);
     final first = s.runs.first.at;
-    double x(RunStats r) => r.at.difference(first).inHours / 24;
+    double hourOf(RunStats r) {
+      final l = r.at.toLocal();
+      return l.hour + l.minute / 60;
+    }
+
+    double x(RunStats r) => _byHour ? hourOf(r) : r.at.difference(first).inHours / 24;
+    final minX = !_byHour || runs.isEmpty ? 0.0 : (runs.map(hourOf).reduce((a, b) => a < b ? a : b) - 0.5).floorToDouble().clamp(0.0, 24.0);
     final maxX = runs.isEmpty ? 1.0 : runs.map(x).reduce((a, b) => a > b ? a : b);
     final maxY = values.isEmpty ? 1.0 : values.reduce((a, b) => a > b ? a : b);
     final ranked = [...runs]..sort((a, b) {
@@ -108,13 +165,22 @@ class _RouteComparePageState extends State<RouteComparePage> {
                 if (f != CompareFactor.redLights || hasLights)
                   ChoiceChip(label: Text(f.label), selected: _factor == f, onSelected: (_) => setState(() => _factor = f)),
             ]),
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('By date'), icon: Icon(Icons.calendar_month_outlined)),
+                ButtonSegment(value: true, label: Text('By time of day'), icon: Icon(Icons.schedule)),
+              ],
+              selected: {_byHour},
+              onSelectionChanged: (v) => setState(() => _byHour = v.first),
+            ),
             const SizedBox(height: 16),
             if (runs.length >= 2)
               SizedBox(
                 height: 220,
                 child: ScatterChart(ScatterChartData(
-                  minX: 0,
-                  maxX: maxX <= 0 ? 1 : maxX * 1.05,
+                  minX: minX,
+                  maxX: _byHour ? (maxX + 0.5).ceilToDouble().clamp(minX + 1, 24.0) : (maxX <= 0 ? 1 : maxX * 1.05),
                   minY: 0,
                   maxY: maxY <= 0 ? 1 : maxY * 1.15,
                   scatterSpots: [
@@ -124,7 +190,9 @@ class _RouteComparePageState extends State<RouteComparePage> {
                         _factor.value(r)!,
                         dotPainter: FlDotCirclePainter(
                           radius: r.tripId == widget.tripId ? 8 : 5,
-                          color: r.tripId == widget.tripId ? cs.primary : (r.rainy ? Colors.blue.shade400 : cs.outline),
+                          color: r.tripId == widget.tripId
+                              ? cs.primary
+                              : (r.rainy ? Colors.blue.shade400 : (_byHour && r.at.toLocal().weekday >= DateTime.saturday ? Colors.orange.shade400 : cs.outline)),
                         ),
                       ),
                   ],
@@ -144,10 +212,10 @@ class _RouteComparePageState extends State<RouteComparePage> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 24,
-                        interval: maxX <= 0 ? 1 : (maxX / 3).ceilToDouble().clamp(1, double.infinity),
-                        getTitlesWidget: (v, m) => v == m.max
+                        interval: _byHour ? (maxX - minX > 8 ? 3 : (maxX - minX > 4 ? 2 : 1)) : (maxX <= 0 ? 1 : (maxX / 3).ceilToDouble().clamp(1, double.infinity)),
+                        getTitlesWidget: (v, m) => v == m.max && !_byHour
                             ? const SizedBox.shrink()
-                            : Text(fmtDateShort(first.add(Duration(hours: (v * 24).round()))), style: t.labelSmall),
+                            : Text(_byHour ? _clock(context, (v * 60).round()) : fmtDateShort(first.add(Duration(hours: (v * 24).round()))), style: t.labelSmall),
                       ),
                     ),
                   ),
@@ -156,7 +224,8 @@ class _RouteComparePageState extends State<RouteComparePage> {
                       getTooltipColor: (_) => cs.inverseSurface,
                       getTooltipItems: (spot) {
                         final r = runs.firstWhere((r) => x(r) == spot.x && _factor.value(r) == spot.y, orElse: () => runs.first);
-                        return ScatterTooltipItem('${_factor.format(spot.y)}\n${fmtDate(r.at)}', textStyle: TextStyle(color: cs.onInverseSurface));
+                        return ScatterTooltipItem('${_factor.format(spot.y)}\n${fmtDate(r.at)} ${TimeOfDay.fromDateTime(r.at.toLocal()).format(context)}',
+                            textStyle: TextStyle(color: cs.onInverseSurface));
                       },
                     ),
                   ),
@@ -167,10 +236,12 @@ class _RouteComparePageState extends State<RouteComparePage> {
               [
                 if (widget.tripId != null) 'Big dot: this trip.',
                 if (hasWeather) 'Blue: rain.',
+                if (_byHour) 'Orange: weekend.',
                 'Usual: ${values.isEmpty ? '—' : _factor.format(median(values))}.',
               ].join(' '),
               style: t.bodySmall,
             ),
+            if (_byHour) ..._slotTable(context, runs),
             if (groups.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text('${_factor.label}, usually', style: t.titleSmall),
