@@ -26,7 +26,8 @@ void main() {
     await db.close();
 
     db = AppDatabase(NativeDatabase(file, setup: (raw) {
-      if (raw.userVersion == 6) {
+      if (raw.userVersion == 7) {
+        raw.execute('DROP TABLE vehicle_values');
         raw.execute('ALTER TABLE vehicles DROP COLUMN ownership');
         raw.execute('ALTER TABLE vehicles DROP COLUMN archived_at');
         raw.execute('ALTER TABLE vehicles DROP COLUMN loan_json');
@@ -63,6 +64,9 @@ void main() {
     // v5 attachments table exists and works.
     await db.into(db.attachments).insert(AttachmentsCompanion.insert(id: 'a1', vehicleId: 'v1', ownerKind: 'vehicle', ownerId: 'v1', fileName: 'a1.jpg', mimeType: 'image/jpeg'));
     expect((await db.select(db.attachments).get()).single.fileName, 'a1.jpg');
+    // v7 vehicle values.
+    await db.into(db.vehicleValues).insert(VehicleValuesCompanion.insert(id: 'vv', vehicleId: 'v1', at: DateTime(2020, 1, 1), value: 20000));
+    expect((await db.select(db.vehicleValues).get()).single.source, 'estimate');
     await db.close();
     await dir.delete(recursive: true);
   });

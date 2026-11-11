@@ -869,6 +869,408 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
   }
 }
 
+class $VehicleValuesTable extends VehicleValues
+    with TableInfo<$VehicleValuesTable, VehicleValue> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VehicleValuesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _vehicleIdMeta = const VerificationMeta(
+    'vehicleId',
+  );
+  @override
+  late final GeneratedColumn<String> vehicleId = GeneratedColumn<String>(
+    'vehicle_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES vehicles (id)',
+    ),
+  );
+  static const VerificationMeta _atMeta = const VerificationMeta('at');
+  @override
+  late final GeneratedColumn<DateTime> at = GeneratedColumn<DateTime>(
+    'at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<double> value = GeneratedColumn<double>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('estimate'),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    vehicleId,
+    at,
+    value,
+    source,
+    notes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'vehicle_values';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VehicleValue> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('vehicle_id')) {
+      context.handle(
+        _vehicleIdMeta,
+        vehicleId.isAcceptableOrUnknown(data['vehicle_id']!, _vehicleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_vehicleIdMeta);
+    }
+    if (data.containsKey('at')) {
+      context.handle(_atMeta, at.isAcceptableOrUnknown(data['at']!, _atMeta));
+    } else if (isInserting) {
+      context.missing(_atMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VehicleValue map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VehicleValue(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      vehicleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vehicle_id'],
+      )!,
+      at: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}at'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}value'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+    );
+  }
+
+  @override
+  $VehicleValuesTable createAlias(String alias) {
+    return $VehicleValuesTable(attachedDatabase, alias);
+  }
+}
+
+class VehicleValue extends DataClass implements Insertable<VehicleValue> {
+  final String id;
+  final String vehicleId;
+  final DateTime at;
+  final double value;
+
+  /// 'purchase', 'estimate' or 'sold'
+  final String source;
+  final String? notes;
+  const VehicleValue({
+    required this.id,
+    required this.vehicleId,
+    required this.at,
+    required this.value,
+    required this.source,
+    this.notes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['vehicle_id'] = Variable<String>(vehicleId);
+    map['at'] = Variable<DateTime>(at);
+    map['value'] = Variable<double>(value);
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    return map;
+  }
+
+  VehicleValuesCompanion toCompanion(bool nullToAbsent) {
+    return VehicleValuesCompanion(
+      id: Value(id),
+      vehicleId: Value(vehicleId),
+      at: Value(at),
+      value: Value(value),
+      source: Value(source),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+    );
+  }
+
+  factory VehicleValue.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VehicleValue(
+      id: serializer.fromJson<String>(json['id']),
+      vehicleId: serializer.fromJson<String>(json['vehicleId']),
+      at: serializer.fromJson<DateTime>(json['at']),
+      value: serializer.fromJson<double>(json['value']),
+      source: serializer.fromJson<String>(json['source']),
+      notes: serializer.fromJson<String?>(json['notes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'vehicleId': serializer.toJson<String>(vehicleId),
+      'at': serializer.toJson<DateTime>(at),
+      'value': serializer.toJson<double>(value),
+      'source': serializer.toJson<String>(source),
+      'notes': serializer.toJson<String?>(notes),
+    };
+  }
+
+  VehicleValue copyWith({
+    String? id,
+    String? vehicleId,
+    DateTime? at,
+    double? value,
+    String? source,
+    Value<String?> notes = const Value.absent(),
+  }) => VehicleValue(
+    id: id ?? this.id,
+    vehicleId: vehicleId ?? this.vehicleId,
+    at: at ?? this.at,
+    value: value ?? this.value,
+    source: source ?? this.source,
+    notes: notes.present ? notes.value : this.notes,
+  );
+  VehicleValue copyWithCompanion(VehicleValuesCompanion data) {
+    return VehicleValue(
+      id: data.id.present ? data.id.value : this.id,
+      vehicleId: data.vehicleId.present ? data.vehicleId.value : this.vehicleId,
+      at: data.at.present ? data.at.value : this.at,
+      value: data.value.present ? data.value.value : this.value,
+      source: data.source.present ? data.source.value : this.source,
+      notes: data.notes.present ? data.notes.value : this.notes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VehicleValue(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('at: $at, ')
+          ..write('value: $value, ')
+          ..write('source: $source, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, vehicleId, at, value, source, notes);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VehicleValue &&
+          other.id == this.id &&
+          other.vehicleId == this.vehicleId &&
+          other.at == this.at &&
+          other.value == this.value &&
+          other.source == this.source &&
+          other.notes == this.notes);
+}
+
+class VehicleValuesCompanion extends UpdateCompanion<VehicleValue> {
+  final Value<String> id;
+  final Value<String> vehicleId;
+  final Value<DateTime> at;
+  final Value<double> value;
+  final Value<String> source;
+  final Value<String?> notes;
+  final Value<int> rowid;
+  const VehicleValuesCompanion({
+    this.id = const Value.absent(),
+    this.vehicleId = const Value.absent(),
+    this.at = const Value.absent(),
+    this.value = const Value.absent(),
+    this.source = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VehicleValuesCompanion.insert({
+    required String id,
+    required String vehicleId,
+    required DateTime at,
+    required double value,
+    this.source = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       vehicleId = Value(vehicleId),
+       at = Value(at),
+       value = Value(value);
+  static Insertable<VehicleValue> custom({
+    Expression<String>? id,
+    Expression<String>? vehicleId,
+    Expression<DateTime>? at,
+    Expression<double>? value,
+    Expression<String>? source,
+    Expression<String>? notes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (vehicleId != null) 'vehicle_id': vehicleId,
+      if (at != null) 'at': at,
+      if (value != null) 'value': value,
+      if (source != null) 'source': source,
+      if (notes != null) 'notes': notes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VehicleValuesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? vehicleId,
+    Value<DateTime>? at,
+    Value<double>? value,
+    Value<String>? source,
+    Value<String?>? notes,
+    Value<int>? rowid,
+  }) {
+    return VehicleValuesCompanion(
+      id: id ?? this.id,
+      vehicleId: vehicleId ?? this.vehicleId,
+      at: at ?? this.at,
+      value: value ?? this.value,
+      source: source ?? this.source,
+      notes: notes ?? this.notes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (vehicleId.present) {
+      map['vehicle_id'] = Variable<String>(vehicleId.value);
+    }
+    if (at.present) {
+      map['at'] = Variable<DateTime>(at.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<double>(value.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VehicleValuesCompanion(')
+          ..write('id: $id, ')
+          ..write('vehicleId: $vehicleId, ')
+          ..write('at: $at, ')
+          ..write('value: $value, ')
+          ..write('source: $source, ')
+          ..write('notes: $notes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AttachmentsTable extends Attachments
     with TableInfo<$AttachmentsTable, Attachment> {
   @override
@@ -9923,6 +10325,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $VehiclesTable vehicles = $VehiclesTable(this);
+  late final $VehicleValuesTable vehicleValues = $VehicleValuesTable(this);
   late final $AttachmentsTable attachments = $AttachmentsTable(this);
   late final $StationsTable stations = $StationsTable(this);
   late final $EnergyEventsTable energyEvents = $EnergyEventsTable(this);
@@ -9943,6 +10346,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     vehicles,
+    vehicleValues,
     attachments,
     stations,
     energyEvents,
@@ -10001,6 +10405,24 @@ typedef $$VehiclesTableUpdateCompanionBuilder =
 final class $$VehiclesTableReferences
     extends BaseReferences<_$AppDatabase, $VehiclesTable, Vehicle> {
   $$VehiclesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$VehicleValuesTable, List<VehicleValue>>
+  _vehicleValuesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.vehicleValues,
+    aliasName: $_aliasNameGenerator(db.vehicles.id, db.vehicleValues.vehicleId),
+  );
+
+  $$VehicleValuesTableProcessedTableManager get vehicleValuesRefs {
+    final manager = $$VehicleValuesTableTableManager(
+      $_db,
+      $_db.vehicleValues,
+    ).filter((f) => f.vehicleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_vehicleValuesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 
   static MultiTypedResultKey<$AttachmentsTable, List<Attachment>>
   _attachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -10239,6 +10661,31 @@ class $$VehiclesTableFilterComposer
     column: $table.loanJson,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> vehicleValuesRefs(
+    Expression<bool> Function($$VehicleValuesTableFilterComposer f) f,
+  ) {
+    final $$VehicleValuesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.vehicleValues,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehicleValuesTableFilterComposer(
+            $db: $db,
+            $table: $db.vehicleValues,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<bool> attachmentsRefs(
     Expression<bool> Function($$AttachmentsTableFilterComposer f) f,
@@ -10588,6 +11035,31 @@ class $$VehiclesTableAnnotationComposer
   GeneratedColumn<String> get loanJson =>
       $composableBuilder(column: $table.loanJson, builder: (column) => column);
 
+  Expression<T> vehicleValuesRefs<T extends Object>(
+    Expression<T> Function($$VehicleValuesTableAnnotationComposer a) f,
+  ) {
+    final $$VehicleValuesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.vehicleValues,
+      getReferencedColumn: (t) => t.vehicleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehicleValuesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.vehicleValues,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> attachmentsRefs<T extends Object>(
     Expression<T> Function($$AttachmentsTableAnnotationComposer a) f,
   ) {
@@ -10804,6 +11276,7 @@ class $$VehiclesTableTableManager
           (Vehicle, $$VehiclesTableReferences),
           Vehicle,
           PrefetchHooks Function({
+            bool vehicleValuesRefs,
             bool attachmentsRefs,
             bool energyEventsRefs,
             bool expensesRefs,
@@ -10907,6 +11380,7 @@ class $$VehiclesTableTableManager
               .toList(),
           prefetchHooksCallback:
               ({
+                vehicleValuesRefs = false,
                 attachmentsRefs = false,
                 energyEventsRefs = false,
                 expensesRefs = false,
@@ -10919,6 +11393,7 @@ class $$VehiclesTableTableManager
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (vehicleValuesRefs) db.vehicleValues,
                     if (attachmentsRefs) db.attachments,
                     if (energyEventsRefs) db.energyEvents,
                     if (expensesRefs) db.expenses,
@@ -10931,6 +11406,27 @@ class $$VehiclesTableTableManager
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (vehicleValuesRefs)
+                        await $_getPrefetchedData<
+                          Vehicle,
+                          $VehiclesTable,
+                          VehicleValue
+                        >(
+                          currentTable: table,
+                          referencedTable: $$VehiclesTableReferences
+                              ._vehicleValuesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$VehiclesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).vehicleValuesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.vehicleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (attachmentsRefs)
                         await $_getPrefetchedData<
                           Vehicle,
@@ -11120,6 +11616,7 @@ typedef $$VehiclesTableProcessedTableManager =
       (Vehicle, $$VehiclesTableReferences),
       Vehicle,
       PrefetchHooks Function({
+        bool vehicleValuesRefs,
         bool attachmentsRefs,
         bool energyEventsRefs,
         bool expensesRefs,
@@ -11129,6 +11626,348 @@ typedef $$VehiclesTableProcessedTableManager =
         bool serviceItemsRefs,
         bool insurancePoliciesRefs,
       })
+    >;
+typedef $$VehicleValuesTableCreateCompanionBuilder =
+    VehicleValuesCompanion Function({
+      required String id,
+      required String vehicleId,
+      required DateTime at,
+      required double value,
+      Value<String> source,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+typedef $$VehicleValuesTableUpdateCompanionBuilder =
+    VehicleValuesCompanion Function({
+      Value<String> id,
+      Value<String> vehicleId,
+      Value<DateTime> at,
+      Value<double> value,
+      Value<String> source,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+
+final class $$VehicleValuesTableReferences
+    extends BaseReferences<_$AppDatabase, $VehicleValuesTable, VehicleValue> {
+  $$VehicleValuesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $VehiclesTable _vehicleIdTable(_$AppDatabase db) =>
+      db.vehicles.createAlias(
+        $_aliasNameGenerator(db.vehicleValues.vehicleId, db.vehicles.id),
+      );
+
+  $$VehiclesTableProcessedTableManager get vehicleId {
+    final $_column = $_itemColumn<String>('vehicle_id')!;
+
+    final manager = $$VehiclesTableTableManager(
+      $_db,
+      $_db.vehicles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_vehicleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$VehicleValuesTableFilterComposer
+    extends Composer<_$AppDatabase, $VehicleValuesTable> {
+  $$VehicleValuesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$VehiclesTableFilterComposer get vehicleId {
+    final $$VehiclesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableFilterComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehicleValuesTableOrderingComposer
+    extends Composer<_$AppDatabase, $VehicleValuesTable> {
+  $$VehicleValuesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$VehiclesTableOrderingComposer get vehicleId {
+    final $$VehiclesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableOrderingComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehicleValuesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VehicleValuesTable> {
+  $$VehicleValuesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get at =>
+      $composableBuilder(column: $table.at, builder: (column) => column);
+
+  GeneratedColumn<double> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  $$VehiclesTableAnnotationComposer get vehicleId {
+    final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.vehicleId,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehicleValuesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VehicleValuesTable,
+          VehicleValue,
+          $$VehicleValuesTableFilterComposer,
+          $$VehicleValuesTableOrderingComposer,
+          $$VehicleValuesTableAnnotationComposer,
+          $$VehicleValuesTableCreateCompanionBuilder,
+          $$VehicleValuesTableUpdateCompanionBuilder,
+          (VehicleValue, $$VehicleValuesTableReferences),
+          VehicleValue,
+          PrefetchHooks Function({bool vehicleId})
+        > {
+  $$VehicleValuesTableTableManager(_$AppDatabase db, $VehicleValuesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VehicleValuesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VehicleValuesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VehicleValuesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> vehicleId = const Value.absent(),
+                Value<DateTime> at = const Value.absent(),
+                Value<double> value = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VehicleValuesCompanion(
+                id: id,
+                vehicleId: vehicleId,
+                at: at,
+                value: value,
+                source: source,
+                notes: notes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String vehicleId,
+                required DateTime at,
+                required double value,
+                Value<String> source = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VehicleValuesCompanion.insert(
+                id: id,
+                vehicleId: vehicleId,
+                at: at,
+                value: value,
+                source: source,
+                notes: notes,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$VehicleValuesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({vehicleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (vehicleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.vehicleId,
+                                referencedTable: $$VehicleValuesTableReferences
+                                    ._vehicleIdTable(db),
+                                referencedColumn: $$VehicleValuesTableReferences
+                                    ._vehicleIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$VehicleValuesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VehicleValuesTable,
+      VehicleValue,
+      $$VehicleValuesTableFilterComposer,
+      $$VehicleValuesTableOrderingComposer,
+      $$VehicleValuesTableAnnotationComposer,
+      $$VehicleValuesTableCreateCompanionBuilder,
+      $$VehicleValuesTableUpdateCompanionBuilder,
+      (VehicleValue, $$VehicleValuesTableReferences),
+      VehicleValue,
+      PrefetchHooks Function({bool vehicleId})
     >;
 typedef $$AttachmentsTableCreateCompanionBuilder =
     AttachmentsCompanion Function({
@@ -16990,6 +17829,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$VehiclesTableTableManager get vehicles =>
       $$VehiclesTableTableManager(_db, _db.vehicles);
+  $$VehicleValuesTableTableManager get vehicleValues =>
+      $$VehicleValuesTableTableManager(_db, _db.vehicleValues);
   $$AttachmentsTableTableManager get attachments =>
       $$AttachmentsTableTableManager(_db, _db.attachments);
   $$StationsTableTableManager get stations =>

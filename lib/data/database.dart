@@ -303,7 +303,23 @@ class Attachments extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// v7: what a vehicle was worth: bought for, estimates, sold for. Insured
+/// values come from insurance policies.
+@DataClassName('VehicleValue')
+class VehicleValues extends Table {
+  TextColumn get id => text()();
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  DateTimeColumn get at => dateTime()();
+  RealColumn get value => real()();
+  /// 'purchase', 'estimate' or 'sold'
+  TextColumn get source => text().withDefault(const Constant('estimate'))();
+  TextColumn get notes => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
+  VehicleValues,
   Attachments,
   Vehicles,
   Stations,
@@ -324,7 +340,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump this and add a migration step whenever the schema changes.
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -356,6 +372,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(vehicles, vehicles.ownership);
             await m.addColumn(vehicles, vehicles.archivedAt);
             await m.addColumn(vehicles, vehicles.loanJson);
+          }
+          if (from < 7) {
+            await m.createTable(vehicleValues);
           }
         },
         beforeOpen: (details) async {

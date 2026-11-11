@@ -14,6 +14,7 @@ import '../domain/road_match.dart' show RoadClass, roadLabel;
 import '../domain/stats.dart';
 import '../domain/trip_stats.dart' show SpeedBand, bandLabel;
 import 'format.dart';
+import 'costs_page.dart';
 import 'lights_page.dart';
 import 'route_compare_page.dart' show fmtMinSec;
 import 'trip_format.dart';
@@ -146,6 +147,16 @@ class _InsightsPageState extends State<InsightsPage> {
                       label: const Text('Show long trips in full'),
                       selected: _full,
                       onSelected: (v) => setState(() => _full = v),
+                    ),
+                  ),
+                  Card(
+                    margin: const EdgeInsets.only(top: 4),
+                    child: ListTile(
+                      leading: const Icon(Icons.savings_outlined),
+                      title: const Text('Running costs and depreciation'),
+                      subtitle: const Text('Everything the car costs, per year and per km'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CostsPage())),
                     ),
                   ),
                   const SizedBox(height: 12),

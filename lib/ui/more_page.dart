@@ -21,6 +21,7 @@ import 'ev_compare_page.dart';
 import 'prices_page.dart';
 import 'sharetank_page.dart';
 import 'vehicle_page.dart';
+import 'costs_page.dart';
 
 class MorePage extends StatefulWidget {
   const MorePage({super.key});
@@ -162,6 +163,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('Vehicles'),
             subtitle: const Text('Switch, add another, or edit details'),
             onTap: () => showVehicleSwitcher(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.savings_outlined),
+            title: const Text('Running costs'),
+            subtitle: const Text('Cost over time, per km, depreciation, is it going up'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CostsPage())),
           ),
           ListTile(
             leading: const Icon(Icons.handyman_outlined),

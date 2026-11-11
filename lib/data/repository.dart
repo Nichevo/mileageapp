@@ -261,6 +261,20 @@ class Repository {
 
   Future<void> deleteExpense(String id) => (db.delete(db.expenses)..where((e) => e.id.equals(id))).go();
 
+  // ---- vehicle values ----------------------------------------------------
+
+  /// Known values of a vehicle (every vehicle's when null), oldest first.
+  Stream<List<VehicleValue>> watchValues(String? vehicleId) => (db.select(db.vehicleValues)
+        ..where((v) => vehicleId == null ? const Constant(true) : v.vehicleId.equals(vehicleId))
+        ..orderBy([(v) => OrderingTerm.asc(v.at)]))
+      .watch();
+
+  Future<void> upsertValue(VehicleValuesCompanion v) => db.into(db.vehicleValues).insertOnConflictUpdate(v);
+
+  Future<void> deleteValue(String id) => (db.delete(db.vehicleValues)..where((v) => v.id.equals(id))).go();
+
+  Stream<List<InsurancePolicy>> watchAllPolicies() => db.select(db.insurancePolicies).watch();
+
   // ---- attachments -------------------------------------------------------
 
   Stream<List<Attachment>> watchAttachmentsOf(String ownerKind, String ownerId) => (db.select(db.attachments)
