@@ -39,11 +39,23 @@ class TripRecorder {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
-  static Future<({String? address, String? name, bool autoStart})> car() async {
-    if (!supported) return (address: null, name: null, autoStart: false);
+  static Future<({String? address, String? name, bool autoStart, int graceMin, int parkedMin})> car() async {
+    if (!supported) return (address: null, name: null, autoStart: false, graceMin: 2, parkedMin: 10);
     final m = await _ch.invokeMapMethod<String, Object?>('getCar') ?? const {};
-    return (address: m['address'] as String?, name: m['name'] as String?, autoStart: m['autoStart'] == true);
+    return (
+      address: m['address'] as String?,
+      name: m['name'] as String?,
+      autoStart: m['autoStart'] == true,
+      graceMin: (m['stopGraceMin'] as num?)?.toInt() ?? 2,
+      parkedMin: (m['parkedStopMin'] as num?)?.toInt() ?? 10,
+    );
   }
+
+  /// When trips end by themselves: [graceMin] after the car's Bluetooth
+  /// disconnects, and after [parkedMin] without moving while the car's
+  /// Bluetooth isn't connected (0 turns that off).
+  static Future<void> setStopRules({required int graceMin, required int parkedMin}) =>
+      _ch.invokeMethod('setStopRules', {'graceMin': graceMin, 'parkedMin': parkedMin});
 
   static Future<void> setCar(String? address, String? name) => _ch.invokeMethod('setCar', {'address': address, 'name': name});
   static Future<void> setAutoStart(bool enabled) => _ch.invokeMethod('setAutoStart', {'enabled': enabled});
@@ -113,11 +125,14 @@ class TripRecorder {
       final meta = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
       final id = meta['id'] as String;
       final csv = File(f.path.replaceFirst('.meta.json', '.csv'));
-      final samples = await csv.exists() ? GpsSample.parseAll(await csv.readAsString()) : <GpsSample>[];
+      final all = await csv.exists() ? GpsSample.parseAll(await csv.readAsString()) : <GpsSample>[];
       final startAt = DateTime.fromMillisecondsSinceEpoch((meta['startAt'] as num).toInt());
       final startedBy = meta['startedBy'] as String? ?? 'manual';
       final existing = await repo.trip(id);
       final ended = meta['endAt'] != null || id != current;
+      // A trip that ended by itself (Bluetooth or parked) ends when the car
+      // last moved; points recorded while it sat parked are dropped.
+      final samples = trimToEnd(all, meta['endAt'] == null ? null : DateTime.fromMillisecondsSinceEpoch((meta['endAt'] as num).toInt()));
       final carVehicle = settings?.vehicleForCar(meta['carAddress'] as String?);
       // Recorded at the start (since v0.18); only trusted if it still exists.
       final metaVehicle = meta['vehicleId'] is String && await repo.vehicle(meta['vehicleId'] as String) != null ? meta['vehicleId'] as String : null;
@@ -209,3 +224,7 @@ Map<String, Object?>? batteryJson(Map<String, dynamic> meta) {
     'battery': {'start': start, 'end': end, 'charging': meta['charging'] == true},
   };
 }
+
+/// Samples up to [endAt] (all of them when it's null).
+List<GpsSample> trimToEnd(List<GpsSample> samples, DateTime? endAt) =>
+    endAt == null ? samples : [for (final s in samples) if (!s.at.isAfter(endAt)) s];

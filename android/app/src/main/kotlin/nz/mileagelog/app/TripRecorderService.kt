@@ -42,13 +42,16 @@ class TripRecorderService : Service(), LocationListener {
         const val ACTION_CAR_CONNECTED = "nz.mileagelog.app.CAR_CONNECTED"
         /** From the home screen widget: start a trip, or stop the one running. */
         const val ACTION_TOGGLE = "nz.mileagelog.app.TOGGLE_TRIP"
+        /** From [TripStopReceiver]: see whether the trip should end now. */
+        const val ACTION_CHECK_STOP = "nz.mileagelog.app.CHECK_STOP"
         const val EXTRA_TRIP_ID = "tripId"
         const val EXTRA_STARTED_BY = "startedBy"
         /** Bluetooth address of the car that started the trip, if any. */
         const val EXTRA_CAR = "carAddress"
         const val CHANNEL_ID = "trip_recording"
         const val NOTIFICATION_ID = 41
-        private const val DISCONNECT_GRACE_MS = 120_000L
+        /** The running service, so the stop alarm knows whether it's alive. */
+        @Volatile var instance: TripRecorderService? = null
 
         fun tripsDir(ctx: Context): File = File(ctx.filesDir, "trips").apply { mkdirs() }
         fun prefs(ctx: Context) = ctx.getSharedPreferences("mileagelog_native", Context.MODE_PRIVATE)
@@ -125,7 +128,9 @@ class TripRecorderService : Service(), LocationListener {
     private var stillSinceElapsed = 0L
     private var startedAtMs = 0L
     private var lastNotifyElapsed = 0L
-    private val stopAfterDisconnect = Runnable { stopTrip() }
+    private var anchor: Location? = null // where the car last came to rest
+    val isRecording: Boolean get() = tripId != null
+    private val checkStop = Runnable { checkAutoStop() }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -133,6 +138,20 @@ class TripRecorderService : Service(), LocationListener {
         super.onCreate()
         lm = getSystemService(LocationManager::class.java)
         ensureChannel(this)
+        instance = this
+    }
+
+    /** Ends the trip if Bluetooth or parking says so; else waits for the next check. */
+    private fun checkAutoStop() {
+        if (tripId == null) return
+        val due = TripAutoStop.dueEnd(this)
+        if (due != null) {
+            stopTrip(endAt = due.first, reason = due.second)
+            return
+        }
+        TripAutoStop.schedule(this)
+        handler.removeCallbacks(checkStop)
+        handler.postDelayed(checkStop, 60_000L)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -142,23 +161,32 @@ class TripRecorderService : Service(), LocationListener {
                 val by = intent.getStringExtra(EXTRA_STARTED_BY) ?: "manual"
                 startTrip(id, by, intent.getStringExtra(EXTRA_CAR))
             }
-            ACTION_STOP -> stopTrip()
+            ACTION_STOP -> if (tripId != null) stopTrip() else {
+                TripAutoStop.finishSaved(this, null, "manual")
+                stopSelf()
+            }
+            // The receiver has already saved the disconnect and set the alarm.
             ACTION_CAR_DISCONNECTED -> if (tripId != null) {
-                handler.removeCallbacks(stopAfterDisconnect)
-                handler.postDelayed(stopAfterDisconnect, DISCONNECT_GRACE_MS)
-                notifyNow("Car disconnected, stopping in 2 minutes")
+                val mins = TripAutoStop.graceMs(this) / 60_000
+                notifyNow("Car disconnected, stopping in $mins minute${if (mins == 1L) "" else "s"}")
+                handler.removeCallbacks(checkStop)
+                handler.postDelayed(checkStop, TripAutoStop.graceMs(this) + 1_000L)
             } else stopSelf()
-            ACTION_CAR_CONNECTED -> handler.removeCallbacks(stopAfterDisconnect)
+            ACTION_CAR_CONNECTED -> if (tripId != null) notifyNow(null) else stopSelf()
+            ACTION_CHECK_STOP -> if (tripId != null) checkAutoStop() else {
+                TripAutoStop.dueEnd(this)?.let { TripAutoStop.finishSaved(this, it.first, it.second) }
+                stopSelf()
+            }
             ACTION_TOGGLE -> {
                 if (tripId != null || currentTripId(this) != null) {
                     // Started with startForegroundService, so we must go
                     // foreground briefly even when stopping.
-                    if (goForeground("Stopping…")) stopTrip() else stopSelf()
                     if (tripId == null && currentTripId(this) != null) {
-                        // Service was restarted without the trip in memory.
-                        prefs(this).edit().remove("currentTripId").remove("currentStartedBy").remove("currentCarAddress").apply()
-                        HomeWidgets.updateTrip(this)
+                        // Service was restarted without the trip in memory:
+                        // end the saved trip at its last GPS point.
+                        TripAutoStop.finishSaved(this, null, "manual")
                     }
+                    if (goForeground("Stopping…")) stopTrip() else stopSelf()
                 } else {
                     startTrip(UUID.randomUUID().toString(), "widget")
                 }
@@ -167,7 +195,16 @@ class TripRecorderService : Service(), LocationListener {
                 // Restarted by the system after being killed: resume the trip
                 // that was in progress, if any.
                 val id = currentTripId(this)
-                if (id != null) startTrip(id, prefs(this).getString("currentStartedBy", "manual")!!, currentCar(this)) else stopSelf()
+                val due = if (id != null) TripAutoStop.dueEnd(this) else null
+                when {
+                    id == null -> stopSelf()
+                    // It should have ended while the app was stopped.
+                    due != null -> {
+                        TripAutoStop.finishSaved(this, due.first, due.second)
+                        stopSelf()
+                    }
+                    else -> startTrip(id, prefs(this).getString("currentStartedBy", "manual")!!, currentCar(this))
+                }
             }
         }
         return START_STICKY
@@ -213,11 +250,15 @@ class TripRecorderService : Service(), LocationListener {
         }.commit()
         val meta = File(tripsDir(this), "$id.meta.json")
         val csv = File(tripsDir(this), "$id.csv")
-        if (meta.exists()) {
+        val resuming = meta.exists()
+        if (resuming) {
             // Resuming after a restart: carry on appending.
             val j = JSONObject(meta.readText())
             startedAtMs = j.optLong("startAt", System.currentTimeMillis())
         } else {
+            TripAutoStop.clear(this)
+            // A trip started by the car's Bluetooth means the car is connected.
+            prefs(this).edit().putBoolean("carConnected", startedBy == "bluetooth").putLong("lastMoveAt", System.currentTimeMillis()).commit()
             startedAtMs = System.currentTimeMillis()
             val m = JSONObject().put("id", id).put("startAt", startedAtMs).put("startedBy", startedBy)
             if (carAddress != null) m.put("carAddress", carAddress)
@@ -230,7 +271,12 @@ class TripRecorderService : Service(), LocationListener {
         distanceM = 0.0
         last = null
         stillSinceElapsed = 0L
-        prefs(this).edit().putFloat("liveKm", 0f).putLong("liveStartMs", startedAtMs).apply()
+        anchor = null
+        prefs(this).edit().putFloat("liveKm", 0f).putLong("liveStartMs", startedAtMs).commit()
+        if (resuming && prefs(this).getLong("lastMoveAt", 0L) == 0L) prefs(this).edit().putLong("lastMoveAt", System.currentTimeMillis()).apply()
+        TripAutoStop.schedule(this)
+        handler.removeCallbacks(checkStop)
+        handler.postDelayed(checkStop, 60_000L)
         setMode(Mode.SLOW)
         notifyNow(null)
         HomeWidgets.updateTrip(this)
@@ -249,8 +295,9 @@ class TripRecorderService : Service(), LocationListener {
         false
     }
 
-    private fun stopTrip(keepService: Boolean = false) {
-        handler.removeCallbacks(stopAfterDisconnect)
+    private fun stopTrip(keepService: Boolean = false, endAt: Long? = null, reason: String = "manual") {
+        handler.removeCallbacks(checkStop)
+        TripAutoStop.clear(this)
         try { lm.removeUpdates(this) } catch (_: Exception) {}
         mode = null
         try { writer?.close() } catch (_: Exception) {}
@@ -258,7 +305,8 @@ class TripRecorderService : Service(), LocationListener {
         tripId?.let { id ->
             val meta = File(tripsDir(this), "$id.meta.json")
             val j = if (meta.exists()) JSONObject(meta.readText()) else JSONObject().put("id", id)
-            j.put("endAt", System.currentTimeMillis())
+            j.put("endAt", endAt ?: System.currentTimeMillis())
+            j.put("endReason", reason)
             batteryPct()?.let { j.put("batteryEnd", it) }
             if (chargedDuringTrip || isCharging()) j.put("charging", true)
             meta.writeText(j.toString())
@@ -298,6 +346,16 @@ class TripRecorderService : Service(), LocationListener {
         if (prev != null && loc.accuracy <= 50 && kmh >= 3) distanceM += prev.distanceTo(loc)
         last = loc
 
+        // Movement for the parked check: 100 m from where the car came to
+        // rest, or clearly driving. GPS wander while parked doesn't count.
+        if (loc.accuracy <= 50) {
+            val a = anchor
+            if (a == null || loc.distanceTo(a) > 100f || kmh >= 15) {
+                anchor = loc
+                prefs(this).edit().putLong("lastMoveAt", loc.time).apply()
+            }
+        }
+
         val now = SystemClock.elapsedRealtime()
         if (kmh < 3) {
             if (stillSinceElapsed == 0L) stillSinceElapsed = now
@@ -311,6 +369,7 @@ class TripRecorderService : Service(), LocationListener {
             }
         }
         if (now - lastNotifyElapsed > 30_000) notifyNow(null)
+        if (TripAutoStop.dueEnd(this) != null) checkAutoStop()
     }
 
     @Deprecated("Deprecated in Java")
@@ -366,6 +425,8 @@ class TripRecorderService : Service(), LocationListener {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
+        handler.removeCallbacks(checkStop)
         try { lm.removeUpdates(this) } catch (_: Exception) {}
         try { writer?.close() } catch (_: Exception) {}
         super.onDestroy()

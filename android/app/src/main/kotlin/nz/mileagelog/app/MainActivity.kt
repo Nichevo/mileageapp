@@ -154,6 +154,8 @@ class MainActivity : FlutterActivity() {
                         "address" to prefs.getString("carAddress", null),
                         "name" to prefs.getString("carName", null),
                         "autoStart" to prefs.getBoolean("autoStart", false),
+                        "stopGraceMin" to prefs.getInt("stopGraceMin", 2),
+                        "parkedStopMin" to prefs.getInt("parkedStopMin", 10),
                     )
                 )
                 "setCar" -> {
@@ -175,6 +177,12 @@ class MainActivity : FlutterActivity() {
                 "setActiveVehicle" -> {
                     prefs.edit().putString("activeVehicleId", call.argument<String>("id"))
                         .putString("activeVehicleName", call.argument<String>("name")).apply()
+                    result.success(true)
+                }
+                "setStopRules" -> {
+                    prefs.edit().putInt("stopGraceMin", (call.argument<Int>("graceMin") ?: 2).coerceIn(1, 30))
+                        .putInt("parkedStopMin", (call.argument<Int>("parkedMin") ?: 10).coerceIn(0, 120)).apply()
+                    TripAutoStop.schedule(this)
                     result.success(true)
                 }
                 "setAutoStart" -> {

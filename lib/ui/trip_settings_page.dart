@@ -17,6 +17,7 @@ class TripSettingsPage extends StatefulWidget {
 class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBindingObserver {
   bool _location = false, _notifications = false, _background = false, _battery = false, _bluetooth = false;
   bool _autoStart = false;
+  int _graceMin = 2, _parkedMin = 10;
   bool _loaded = false;
   List<Vehicle> _vehicles = const [];
 
@@ -63,9 +64,19 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
       _battery = r[3];
       _bluetooth = r[4];
       _autoStart = car.autoStart;
+      _graceMin = car.graceMin;
+      _parkedMin = car.parkedMin;
       _vehicles = vehicles;
       _loaded = true;
     });
+  }
+
+  Future<void> _setStop({int? grace, int? parked}) async {
+    setState(() {
+      _graceMin = grace ?? _graceMin;
+      _parkedMin = parked ?? _parkedMin;
+    });
+    await TripRecorder.setStopRules(graceMin: _graceMin, parkedMin: _parkedMin);
   }
 
   Future<void> _ask(String name) async {
@@ -186,6 +197,36 @@ class _TripSettingsPageState extends State<TripSettingsPage> with WidgetsBinding
                     'If Android still blocks a background start, you\'ll get a "Connected to your car" notification instead. Tap it to start the trip. Samsung phones: also check Settings > Battery > Background usage limits and make sure MileageLog isn\'t in "Sleeping apps".',
                     style: t.bodySmall,
                   ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text('Ending trips', style: t.titleSmall),
+                ),
+                ListTile(
+                  title: const Text('After the car\'s Bluetooth disconnects'),
+                  subtitle: const Text('Any trip in that car ends, including one you started yourself. Reconnecting in time carries on the same trip.'),
+                  trailing: DropdownButton<int>(
+                    value: _graceMin,
+                    items: [for (final m in const [1, 2, 5, 10]) DropdownMenuItem(value: m, child: Text('$m min'))],
+                    onChanged: (v) => _setStop(grace: v),
+                  ),
+                ),
+                ListTile(
+                  title: const Text('When parked'),
+                  subtitle: const Text('Ends the trip when the car hasn\'t moved 100 m for this long and its Bluetooth isn\'t connected. '
+                      'For cars without Bluetooth linked, or if a disconnect is missed. Not used while the car\'s Bluetooth is connected, so queues don\'t end trips.'),
+                  trailing: DropdownButton<int>(
+                    value: _parkedMin,
+                    items: [
+                      for (final m in const [0, 5, 10, 15, 30, 60]) DropdownMenuItem(value: m, child: Text(m == 0 ? 'Never' : '$m min')),
+                    ],
+                    onChanged: (v) => _setStop(parked: v),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text('A trip that ends by itself ends when the car last moved, not when the phone noticed.', style: t.bodySmall),
                 ),
                 const Divider(),
                 SwitchListTile(

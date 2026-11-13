@@ -33,7 +33,7 @@ class _TripsPageState extends State<TripsPage> {
   List<GpsSample> _live = const [];
   Timer? _timer;
   bool _busy = false;
-  ({String? address, String? name, bool autoStart})? _car;
+  ({String? address, String? name, bool autoStart, int graceMin, int parkedMin})? _car;
   TripSort _sort = TripSort.newest;
   TripPeriod _period = TripPeriod.all;
   TripSize _size = TripSize.any;

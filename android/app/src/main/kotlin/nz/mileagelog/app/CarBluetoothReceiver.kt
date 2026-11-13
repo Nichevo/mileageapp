@@ -13,8 +13,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 
 /**
- * Starts a trip when the phone connects to the car's Bluetooth and stops it
- * two minutes after it disconnects (so a quick stop at the shops with the
+ * Starts a trip when the phone connects to the car's Bluetooth (if automatic
+ * start is on) and stops any trip a set time after it disconnects, two
+ * minutes by default (so a quick stop at the shops with the
  * engine off does not split the trip if you're back within the grace period).
  *
  * ACL connect/disconnect broadcasts are exempt from Android's implicit
@@ -25,7 +26,7 @@ class CarBluetoothReceiver : BroadcastReceiver() {
     @SuppressLint("MissingPermission") // checked just below
     override fun onReceive(ctx: Context, intent: Intent) {
         val prefs = TripRecorderService.prefs(ctx)
-        if (!prefs.getBoolean("autoStart", false)) return
+        val autoStart = prefs.getBoolean("autoStart", false)
         val cars = TripRecorderService.carAddresses(ctx)
         if (cars.isEmpty()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
@@ -43,9 +44,13 @@ class CarBluetoothReceiver : BroadcastReceiver() {
         when (intent.action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 if (TripRecorderService.currentTripId(ctx) != null) {
-                    if (sameCar) TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_CONNECTED)
+                    if (sameCar) {
+                        TripAutoStop.carConnected(ctx)
+                        try { TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_CONNECTED) } catch (_: Exception) {}
+                    }
                     return
                 }
+                if (!autoStart) return
                 try {
                     TripRecorderService.start(ctx, "bluetooth", carAddress = address)
                 } catch (e: Exception) {
@@ -57,7 +62,11 @@ class CarBluetoothReceiver : BroadcastReceiver() {
                 }
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                // Stops any trip in this car, also one started by hand. The
+                // stop is saved and an alarm set, so it happens even if the
+                // recorder is asleep or gets restarted in between.
                 if (TripRecorderService.currentTripId(ctx) != null && sameCar) {
+                    TripAutoStop.carDisconnected(ctx)
                     try {
                         TripRecorderService.send(ctx, TripRecorderService.ACTION_CAR_DISCONNECTED)
                     } catch (_: Exception) {}

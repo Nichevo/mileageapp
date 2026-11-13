@@ -125,7 +125,7 @@ void main() {
     await tester.runAsync(() => saveTrip(repo, v.id, 't', 'To town', shifted(sim([('go', 2000)]), start)));
     await tester.pumpWidget(AppScope(repo: repo, settings: settings, child: const MaterialApp(home: Scaffold(body: ParkedCard()))));
     await io(tester);
-    expect(find.textContaining('Parked at'), findsOneWidget);
+    expect(find.textContaining('Parked '), findsOneWidget); // 'at' or 'on <date>' near midnight
     expect(find.text('Find car'), findsOneWidget);
     expect(ParkedCard.directions(-36.9, 174.8).toString(), contains('destination=-36.9,174.8&travelmode=walking'));
     await tester.tap(find.text('Hide'));

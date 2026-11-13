@@ -83,6 +83,7 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_dashboard_info"/>
         </receiver>
         <receiver android:name=".ReminderReceiver" android:exported="false"/>
+        <receiver android:name=".TripStopReceiver" android:exported="false"/>
         <receiver android:name=".BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
