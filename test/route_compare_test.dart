@@ -99,6 +99,34 @@ void main() {
     expect(commonStretches(tracks).single.km, closeTo(5.0, 0.2));
   });
 
+  test('trips with the same start and finish compare whole, whatever way they went', () {
+    // Same ends, but this one takes a parallel street (220 m away) for a kilometre.
+    final detour = [
+      for (final p in moved(a, const Duration(days: 1)))
+        GpsSample(p.at, p.lon > 174.72 && p.lon < 174.735 ? p.lat + 0.002 : p.lat, p.lon, speedMps: p.speedMps, accuracyM: p.accuracyM),
+    ];
+    final tracks = [
+      Track.from('a', a),
+      Track.from('detour', detour),
+      Track.from('same', moved(a, const Duration(days: 2))),
+      Track.from('b', b), // starts elsewhere
+    ];
+    final j = sameJourney(tracks.first, tracks)!;
+    expect(j.whole, isTrue);
+    expect(j.runs.map((r) => r.track.id), ['a', 'detour', 'same']);
+    expect(j.km, closeTo(5.0, 0.2));
+    final shown = compareStretches(tracks.first, tracks);
+    expect(shown.first.whole, isTrue);
+    // A stretch is only added when it brings in another trip (b here).
+    expect(shown.skip(1).every((s) => s.runs.any((r) => r.track.id == 'b')), isTrue);
+    const home = Place('h', 'Home', lat0, 174.70), work = Place('w', 'Work', lat0, 174.76);
+    expect(stretchName(j, [home, work]), 'Home → Work, whole trip');
+    final common = commonStretches(tracks);
+    expect(common.first.whole, isTrue);
+    expect(common.first.runs, hasLength(3));
+    expect(sameJourney(Track.from('short', drive(174.70, 174.715)), tracks), isNull);
+  });
+
   test('near matches are scored with the reason they do not count', () {
     final short = moved(drive(174.70, 174.715), const Duration(days: 5)); // about 1.3 km
     final drift = moved(a, const Duration(days: 6), dLat: 0.0006); // about 67 m off

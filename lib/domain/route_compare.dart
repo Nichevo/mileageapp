@@ -207,7 +207,9 @@ class Stretch {
   final Track base;
   final double from, to;
   final List<StretchRun> runs; // including base's own run, oldest first
-  const Stretch(this.base, this.from, this.to, this.runs);
+  /// Every run is a whole trip with the same start and finish.
+  final bool whole;
+  const Stretch(this.base, this.from, this.to, this.runs, {this.whole = false});
   double get km => to - from;
   LatLon get startAt {
     final p = base.pointAt(from);
@@ -267,9 +269,62 @@ List<Stretch> findStretches(Track t, Iterable<Track> others, {int max = 2, doubl
   return picked;
 }
 
+/// Trips that start and finish where [t] does (within [radiusKm]), compared
+/// end to end whatever way they went. Null when there are none.
+Stretch? sameJourney(Track t, Iterable<Track> others, {double radiusKm = 0.3}) {
+  if (t.pts.length < 2) return null;
+  final a = t.pts.first, b = t.pts.last;
+  bool near(TrackPoint p, TrackPoint q) => haversineKm(p.lat, p.lon, q.lat, q.lon) <= radiusKm;
+  // A short hop that starts and ends at the same place isn't a journey to compare.
+  if (t.km < minStretchKm) return null;
+  final runs = <StretchRun>[StretchRun(t, 0, t.km)];
+  for (final o in others) {
+    if (o.id == t.id || o.pts.length < 2) continue;
+    if (near(o.pts.first, a) && near(o.pts.last, b)) runs.add(StretchRun(o, 0, o.km));
+  }
+  if (runs.length < 2) return null;
+  runs.sort((x, y) => x.track.start.compareTo(y.track.start));
+  return Stretch(t, 0, t.km, runs, whole: true);
+}
+
+/// What to show for one trip: the whole journey compared with the same
+/// journey on other days first, then shared stretches that add something
+/// (other trips, or ones that only partly match).
+List<Stretch> compareStretches(Track t, List<Track> others, {int max = 2}) {
+  final j = sameJourney(t, others);
+  final parts = findStretches(t, others, max: max);
+  if (j == null) return parts;
+  final inJourney = {for (final r in j.runs) r.track.id};
+  return [
+    j,
+    for (final s in parts)
+      if (!s.runs.every((r) => inJourney.contains(r.track.id))) s,
+  ].take(max + 1).toList();
+}
+
 /// The most-driven stretches across all trips, most-driven first. Each trip
 /// appears in at most one stretch as its base.
 List<Stretch> commonStretches(List<Track> tracks, {int minTrips = 3}) {
+  // Whole journeys first: same start and finish, whatever the route.
+  final journeys = <Stretch>[];
+  final inJourney = <String>{};
+  final byLength = [...tracks]..sort((a, b) => b.km.compareTo(a.km));
+  for (final t in byLength) {
+    if (inJourney.contains(t.id)) continue;
+    final j = sameJourney(t, tracks);
+    if (j == null || j.runs.length < minTrips) continue;
+    journeys.add(j);
+    inJourney.addAll(j.runs.map((r) => r.track.id));
+  }
+  final parts = _commonParts(tracks, minTrips: minTrips);
+  return [
+    ...journeys,
+    for (final s in parts)
+      if (!s.runs.every((r) => inJourney.contains(r.track.id))) s,
+  ]..sort((a, b) => b.runs.length.compareTo(a.runs.length));
+}
+
+List<Stretch> _commonParts(List<Track> tracks, {required int minTrips}) {
   // Longest trips first, so a trip that recorded only part of the way
   // doesn't become the base and cut its route short.
   final sorted = [...tracks]..sort((a, b) {
@@ -409,6 +464,7 @@ String stretchName(Stretch s, List<Place> places) {
   final a = near(s.startAt), b = near(s.endAt);
   final title = placeTitle(a, b);
   final km = '${s.km.toStringAsFixed(1)} km';
+  if (s.whole) return title == null ? 'Same start and finish, whole trip' : '$title, whole trip';
   return title == null ? '$km stretch' : '$title ($km)';
 }
 

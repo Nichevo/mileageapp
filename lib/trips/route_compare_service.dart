@@ -75,7 +75,7 @@ class RouteCompare {
     return Isolate.run(() {
       final tracks = _tracks(data);
       final t = tracks.firstWhere((x) => x.id == tripId);
-      final found = findStretches(t, tracks);
+      final found = compareStretches(t, tracks);
       final shown = [for (final s in found) _result(s, places)];
       return TripComparison(shown, [
         for (final n in nearMatches(t, tracks, found)) (match: n, name: names[n.tripId] ?? 'Trip', stretch: n.stretch == null ? null : shown[n.stretch!].name),
