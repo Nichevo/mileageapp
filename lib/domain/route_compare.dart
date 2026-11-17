@@ -245,14 +245,24 @@ List<Stretch> findStretches(Track t, Iterable<Track> others, {int max = 2, doubl
       }
     }
     runs.sort((x, y) => x.track.start.compareTo(y.track.start));
-    scored.add(((runs.length - 1) * math.sqrt(c.km), Stretch(t, c.a0, c.a1, runs)));
+    scored.add(((runs.length - 1) * math.pow(c.km, 1.5).toDouble(), Stretch(t, c.a0, c.a1, runs)));
   }
-  scored.sort((x, y) => y.$1.compareTo(x.$1));
-  final picked = <Stretch>[];
-  for (final (_, s) in scored) {
+  // Length counts for more than the number of runs, so one trip that
+  // started recording late (GPS still finding itself) or left by another
+  // exit doesn't cut the whole route down to the part every trip shares.
+  final most = scored.map((x) => x.$2.runs.length).reduce(math.max);
+  final eligible = [for (final x in scored) if (x.$2.runs.length >= math.max(2, (0.5 * most).ceil())) x]..sort((x, y) => y.$1.compareTo(x.$1));
+  final picked = <Stretch>[eligible.first.$2];
+  // The shorter part that more trips share is worth seeing too.
+  final widest = [...scored]..sort((x, y) {
+      final c = y.$2.runs.length.compareTo(x.$2.runs.length);
+      return c != 0 ? c : y.$2.km.compareTo(x.$2.km);
+    });
+  if (picked.length < max && widest.first.$2.runs.length > picked.first.runs.length) picked.add(widest.first.$2);
+  for (final (_, s) in eligible) {
+    if (picked.length >= max) break;
     final clash = picked.any((p) => math.min(p.to, s.to) - math.max(p.from, s.from) > 0.3 * s.km);
     if (!clash) picked.add(s);
-    if (picked.length >= max) break;
   }
   return picked;
 }
@@ -260,15 +270,23 @@ List<Stretch> findStretches(Track t, Iterable<Track> others, {int max = 2, doubl
 /// The most-driven stretches across all trips, most-driven first. Each trip
 /// appears in at most one stretch as its base.
 List<Stretch> commonStretches(List<Track> tracks, {int minTrips = 3}) {
-  final sorted = [...tracks]..sort((a, b) => b.start.compareTo(a.start));
+  // Longest trips first, so a trip that recorded only part of the way
+  // doesn't become the base and cut its route short.
+  final sorted = [...tracks]..sort((a, b) {
+      final c = b.km.compareTo(a.km);
+      return c != 0 ? c : b.start.compareTo(a.start);
+    });
   final out = <Stretch>[];
   final covered = <String>{};
   for (final t in sorted) {
     if (covered.contains(t.id)) continue;
-    final s = findStretches(t, sorted, max: 1);
+    final s = findStretches(t, sorted);
     if (s.isEmpty || s.first.runs.length < minTrips) continue;
     out.add(s.first);
-    covered.addAll(s.first.runs.map((r) => r.track.id));
+    // Trips on the shorter shared part count as covered too.
+    for (final x in s) {
+      covered.addAll(x.runs.map((r) => r.track.id));
+    }
   }
   out.sort((a, b) => b.runs.length.compareTo(a.runs.length));
   return out;

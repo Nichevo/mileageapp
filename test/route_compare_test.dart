@@ -84,6 +84,21 @@ void main() {
     expect(stretchName(best, const []), '3.3 km stretch');
   });
 
+  test('one trip that started recording late does not cut the route short', () {
+    final tracks = [
+      Track.from('a', a),
+      Track.from('w1', moved(a, const Duration(days: 1))),
+      Track.from('w2', moved(a, const Duration(days: 2))),
+      Track.from('late', moved(drive(174.72, 174.76), const Duration(days: 3))), // first 1.7 km missing
+    ];
+    final s = findStretches(tracks.first, tracks);
+    expect(s.first.km, closeTo(5.0, 0.2)); // the whole trip, driven 3 times
+    expect(s.first.runs.map((r) => r.track.id), ['a', 'w1', 'w2']);
+    expect(s[1].runs, hasLength(4)); // and the part all four share
+    expect(s[1].km, closeTo(3.3, 0.2));
+    expect(commonStretches(tracks).single.km, closeTo(5.0, 0.2));
+  });
+
   test('near matches are scored with the reason they do not count', () {
     final short = moved(drive(174.70, 174.715), const Duration(days: 5)); // about 1.3 km
     final drift = moved(a, const Duration(days: 6), dLat: 0.0006); // about 67 m off
